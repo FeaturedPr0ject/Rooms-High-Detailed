@@ -18,7 +18,7 @@
 <canvas id="game" width="960" height="540" aria-label="Rooms game canvas"></canvas>
 <div class="overlay" id="overlay"><div class="dialog"><div class="eyebrow">AN UNKNOWN PLACE</div><h1>ROOMS</h1><p>A quiet corridor. A long sequence of doors. Keep moving, listen carefully, and don't let it catch you.</p><button class="btn" id="start">ENTER</button><div class="hint">BEST EXPERIENCED WITH HEADPHONES</div></div></div>
 </section>
-<section class="hud"><canvas id="room-label" class="room-label" width="120" height="18" aria-label="Room counter"></canvas><div class="roblox-health" id="roblox-health"><div class="health-track"><div class="health-fill" id="health-fill"></div></div></div><div class="game-status" id="status">WAITING</div><div class="game-actions"><button id="mute" class="btn">SOUND ON</button><button id="pause" class="btn">PAUSE</button></div></section><div class="controls"><span>WASD / ARROWS — MOVE</span><span>E / SPACE — OPEN DOOR</span><span>F — FLASHLIGHT</span><span>ESC — PAUSE</span></div>
+<section class="hud"><canvas id="room-label" class="room-label" width="150" height="23" aria-label="Room counter"></canvas><div class="roblox-health" id="roblox-health"><div class="health-track"><div class="health-fill" id="health-fill"></div></div></div><div class="game-status" id="status">WAITING</div><div class="game-actions"><button id="mute" class="btn">SOUND ON</button><button id="pause" class="btn">PAUSE</button></div></section><div class="controls"><span>WASD / ARROWS — MOVE</span><span>E / SPACE — OPEN DOOR</span><span>F — FLASHLIGHT</span><span>ESC — PAUSE</span></div>
 </main>
 <script>
 (()=>{
@@ -38,7 +38,7 @@ const style=getComputedStyle(el);
 const size=parseFloat(style.fontSize)||12;
 const lineHeight=parseFloat(style.lineHeight)||size*1.25;
 const spacing=style.letterSpacing==='normal'?0:parseFloat(style.letterSpacing)||0;
-const scale=.62;
+const scale=.82;
 const measure=document.createElement('canvas').getContext('2d');
 measure.font=style.font||`${style.fontWeight} ${size}px ${style.fontFamily}`;
 const paragraph=el.tagName==='P';
@@ -96,7 +96,7 @@ measure.font=font;
 const size=parseFloat(font.match(/[0-9.]+px/)?.[0]||'13');
 const width=Math.ceil(measure.measureText(text).width+6);
 const height=Math.ceil(size*1.8);
-const scale=.62;
+const scale=.82;
 const raster=document.createElement('canvas');
 raster.width=Math.ceil(width*scale);
 raster.height=Math.ceil(height*scale);
@@ -115,7 +115,7 @@ ctx.imageSmoothingEnabled=false;
 ctx.drawImage(item.canvas,left,baseline-item.baseline,item.width,item.height);
 ctx.restore();
 }
-function updateHud(){roomLabelCtx.clearRect(0,0,120,18);roomLabelCtx.fillStyle='#c2b88d';roomLabelCtx.font='700 10px Arial,Helvetica,sans-serif';roomLabelCtx.textBaseline='alphabetic';let labelX=0;for(const char of 'ROOM '+String(room).padStart(3,'0')){roomLabelCtx.fillText(char,labelX,12);labelX+=roomLabelCtx.measureText(char).width+.9}const value=Math.max(0,Math.round(health/3*100));const bar=document.getElementById('roblox-health');bar.style.display=value<100?'block':'none';const fill=document.getElementById('health-fill');fill.style.width=value+'%';fill.style.background=value<=33?'linear-gradient(#ff7777,#b51f1f)':value<=66?'linear-gradient(#f5d66b,#c28a22)':'linear-gradient(#71e36b,#279c38)'}
+function updateHud(){roomLabelCtx.clearRect(0,0,150,23);roomLabelCtx.fillStyle='#c2b88d';roomLabelCtx.font='700 11px Arial,Helvetica,sans-serif';roomLabelCtx.textBaseline='alphabetic';let labelX=0;for(const char of 'ROOM '+String(room).padStart(3,'0')){roomLabelCtx.fillText(char,labelX,14);labelX+=roomLabelCtx.measureText(char).width+.9}const value=Math.max(0,Math.round(health/3*100));const bar=document.getElementById('roblox-health');bar.style.display=value<100?'block':'none';const fill=document.getElementById('health-fill');fill.style.width=value+'%';fill.style.background=value<=33?'linear-gradient(#ff7777,#b51f1f)':value<=66?'linear-gradient(#f5d66b,#c28a22)':'linear-gradient(#71e36b,#279c38)'}
 function start(){overlay.style.display='none';running=true;paused=false;dead=false;room=0;health=3;player.x=480;player.y=390;entity=null;entityTimer=0;updateHud();statusEl.textContent='LISTEN';sound(260,.12);last=performance.now();requestAnimationFrame(loop)}
 function showOverlay(title,copy,button){overlay.style.display='grid';overlay.querySelector('.eyebrow').textContent='ROOM '+String(room).padStart(3,'0');overlay.querySelector('h1').textContent=title;overlay.querySelector('p').textContent=copy;startBtn.textContent=button}
 function togglePause(){if(!running||dead)return;paused=!paused;statusEl.textContent=paused?'PAUSED':'LISTEN';if(paused)showOverlay('PAUSED','Take a breath. The corridor is still waiting.','RESUME');else overlay.style.display='none'}
