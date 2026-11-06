@@ -178,7 +178,7 @@ function update(dt){
    for(const clone of entity.clones){clone.age+=dt;clone.lift=Math.min(2.6,clone.lift+dt*1.8)}
    entity.clones=entity.clones.filter(clone=>clone.age<1.25);
    if(!entity.damaged&&Math.abs(entity.z-player.z)<.72&&Math.abs(entity.x-player.x)<.95){entity.damaged=true;hurt(15)}
-   if(entity.z<.25){entity=null;entityCooldown=10;setStatus('QUIET')}
+   if(entity.z<player.z-2.4){entity=null;entityCooldown=10;setStatus('QUIET')}
   }
  }
  if(entityCooldown>0)entityCooldown-=dt;
@@ -343,7 +343,7 @@ function loop(t){
  if(!running||paused||dead)return;
  const dt=Math.min((t-last)/1000,.04);last=t;update(dt);draw();requestAnimationFrame(loop);
 }
-installPixelText();updateHud();last=performance.now();requestAnimationFrame(loop);
+installPixelText();updateHud();setStatus('LOBBY');last=performance.now();requestAnimationFrame(loop);
 })();
 </script>
 </body>
