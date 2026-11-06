@@ -190,43 +190,70 @@ function polygon(points,color,stroke){
  ctx.beginPath();ctx.moveTo(points[0].x,points[0].y);for(let i=1;i<points.length;i++)ctx.lineTo(points[i].x,points[i].y);ctx.closePath();
  ctx.fillStyle=color;ctx.fill();if(stroke){ctx.strokeStyle=stroke;ctx.lineWidth=1;ctx.stroke()}
 }
+const ROOM_PALETTES=[
+ {wall:['#705239','#614630','#7a5b3d'],edge:'#b18a58',groove:'#4b3526',floor:['#51402f','#5b4936'],ceiling:'#403124',door:'#503a28',doorFace:'#795738',panel:'#98744b'},
+ {wall:['#965c50','#824b43','#a66c60'],edge:'#d39a83',groove:'#593630',floor:['#55413a','#614841'],ceiling:'#493431',door:'#633e37',doorFace:'#a26a5e',panel:'#c08a79'},
+ {wall:['#646d72','#535d63','#747e82'],edge:'#b1b7b3',groove:'#3d464a',floor:['#444d50','#50595b'],ceiling:'#353e42',door:'#394348',doorFace:'#758187',panel:'#9ba5a3'}
+];
+function paletteAt(z){
+ const section=Math.floor(Math.max(0,z)/ROOM_LENGTH);
+ return ROOM_PALETTES[section%ROOM_PALETTES.length];
+}
 function drawFloor(){
- const near=player.z+.45,far=player.z+48;
- const points=[project(-CORRIDOR_HALF,near,0),project(CORRIDOR_HALF,near,0),project(CORRIDOR_HALF,far,0),project(-CORRIDOR_HALF,far,0)];
- polygon(points,'#292b24');
+ const near=Math.max(0,player.z-ROOM_LENGTH),far=player.z+48;
  for(let z=Math.floor(near/2)*2;z<far;z+=2){
-  const a=project(-CORRIDOR_HALF,z,0),b=project(CORRIDOR_HALF,z,0);
-  if(a&&b){ctx.strokeStyle=z%4===0?'#3c3d31':'#303329';ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.lineTo(b.x,b.y);ctx.stroke()}
+  for(let x=-CORRIDOR_HALF;x<CORRIDOR_HALF;x+=1.275){
+   const p=[project(x,z,0),project(x+1.275,z,0),project(x+1.275,z+2,0),project(x,z+2,0)];
+   if(p.some(v=>!v))continue;
+   const palette=paletteAt(z);
+   const tone=(Math.floor(z/2)+Math.floor((x+CORRIDOR_HALF)/1.275))%2;
+   polygon(p,palette.floor[tone]);
+   const seamA=project(x,z+2,0),seamB=project(x+1.275,z+2,0);
+   if(seamA&&seamB){ctx.strokeStyle='#b4a18433';ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(seamA.x,seamA.y);ctx.lineTo(seamB.x,seamB.y);ctx.stroke()}
+  }
  }
- for(let x=-2;x<=2;x+=1){
-  const a=project(x,near,0),b=project(x,far,0);
-  if(a&&b){ctx.strokeStyle='#34362d';ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.lineTo(b.x,b.y);ctx.stroke()}
+}
+function drawCeiling(){
+ const near=Math.max(0,player.z-ROOM_LENGTH),far=player.z+42;
+ for(let z=Math.floor(near/3)*3;z<far;z+=3){
+  const p=[project(-CORRIDOR_HALF,z,3.55),project(CORRIDOR_HALF,z,3.55),project(CORRIDOR_HALF,z+3,3.55),project(-CORRIDOR_HALF,z+3,3.55)];
+  if(p.some(v=>!v))continue;
+  const tone=Math.floor(z/3)%2;
+  polygon(p,tone?'#34312a':'#3e392f');
+  const a=project(-CORRIDOR_HALF,z+3,3.55),b=project(CORRIDOR_HALF,z+3,3.55);
+  if(a&&b){ctx.strokeStyle='#9f916c55';ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.lineTo(b.x,b.y);ctx.stroke()}
  }
 }
 function drawSideWalls(){
- const start=Math.floor((player.z+.4)/2)*2;
+ const start=Math.max(0,Math.floor((player.z-ROOM_LENGTH)/2)*2);
  for(let z=start;z<player.z+42;z+=2){
-  const z1=Math.max(player.z+.3,z),z2=z+2;
   for(const side of [-1,1]){
-   const x=side*CORRIDOR_HALF;
-   const points=[project(x,z1,0),project(x,z2,0),project(x,z2,3.55),project(x,z1,3.55)];
-   polygon(points,(Math.floor(z/2)%2===0)?(side<0?'#30332b':'#292d27'):(side<0?'#292d26':'#252a24'),'#3d4034');
-   const trim1=project(x,z1,3.35),trim2=project(x,z2,3.35);
-   if(trim1&&trim2){ctx.strokeStyle='#555342';ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(trim1.x,trim1.y);ctx.lineTo(trim2.x,trim2.y);ctx.stroke()}
+   const x=side*CORRIDOR_HALF,palette=paletteAt(z);
+   const points=[project(x,z,0),project(x,z+2,0),project(x,z+2,3.55),project(x,z,3.55)];
+   polygon(points,palette.wall[(Math.floor(z/2)+ (side===1?1:0))%palette.wall.length],palette.edge);
+   const trimA=project(x-side*.012,z,3.34),trimB=project(x-side*.012,z+2,3.34);
+   if(trimA&&trimB){ctx.strokeStyle=palette.edge;ctx.globalAlpha=.58;ctx.lineWidth=1.5;ctx.beginPath();ctx.moveTo(trimA.x,trimA.y);ctx.lineTo(trimB.x,trimB.y);ctx.stroke();ctx.globalAlpha=1}
+   const lowerA=project(x-side*.014,z,.18),lowerB=project(x-side*.014,z+2,.18);
+   if(lowerA&&lowerB){ctx.strokeStyle=palette.groove;ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(lowerA.x,lowerA.y);ctx.lineTo(lowerB.x,lowerB.y);ctx.stroke()}
+   const mid1=project(x-side*.018,z+1,0),mid2=project(x-side*.018,z+1,3.25);
+   if(mid1&&mid2){ctx.strokeStyle=palette.groove;ctx.lineWidth=Math.max(1,mid1.scale*.006);ctx.beginPath();ctx.moveTo(mid1.x,mid1.y);ctx.lineTo(mid2.x,mid2.y);ctx.stroke()}
    if(Math.round(z)%8===0){
-    const center=project(x-side*.025,z+1,1.9);
+    const center=project(x-side*.035,z+1,1.9);
     if(center&&center.x>-60&&center.x<W+60){
      const w=Math.max(2,center.scale*.12),h=Math.max(3,center.scale*.24);
      ctx.fillStyle='#171b16';ctx.fillRect(center.x-w/2,center.y-h/2,w,h);
-     ctx.fillStyle='#b5a273';ctx.fillRect(center.x-w*.25,center.y-h*.34,w*.5,h*.68);
+     ctx.fillStyle='#d6b77b';ctx.fillRect(center.x-w*.25,center.y-h*.34,w*.5,h*.68);
+     ctx.fillStyle='#f2dca0';ctx.globalAlpha=.25;ctx.beginPath();ctx.arc(center.x,center.y,h*.85,0,Math.PI*2);ctx.fill();ctx.globalAlpha=1;
     }
    }
    if(Math.round(z)%10===0){
     const zDoor=z+1;
     const p=[project(x,zDoor-.72,0),project(x,zDoor+.72,0),project(x,zDoor+.72,2.55),project(x,zDoor-.72,2.55)];
-    polygon(p,'#171c17','#746d50');
+    polygon(p,palette.door,palette.edge);
     const inner=[project(x-side*.025,zDoor-.58,.08),project(x-side*.025,zDoor+.58,.08),project(x-side*.025,zDoor+.58,2.42),project(x-side*.025,zDoor-.58,2.42)];
-    polygon(inner,'#30352b','#8b805e');
+    polygon(inner,palette.doorFace,palette.panel);
+    const insetA=project(x-side*.04,zDoor, .3),insetB=project(x-side*.04,zDoor,2.2);
+    if(insetA&&insetB){ctx.strokeStyle=palette.edge;ctx.globalAlpha=.45;ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(insetA.x,insetA.y);ctx.lineTo(insetB.x,insetB.y);ctx.stroke();ctx.globalAlpha=1}
    }
   }
  }
@@ -234,13 +261,13 @@ function drawSideWalls(){
 function drawEndDoor(){
  const doorZ=(room+1)*ROOM_LENGTH;
  const wall=[project(-CORRIDOR_HALF,doorZ,0),project(CORRIDOR_HALF,doorZ,0),project(CORRIDOR_HALF,doorZ,3.6),project(-CORRIDOR_HALF,doorZ,3.6)];
- polygon(wall,'#292d26','#555542');
+ polygon(wall,paletteAt(doorZ).wall[0],paletteAt(doorZ).edge);
  const frame=[project(-1.18,doorZ-.015,0),project(1.18,doorZ-.015,0),project(1.18,doorZ-.015,3.1),project(-1.18,doorZ-.015,3.1)];
- polygon(frame,'#111510','#777052');
+ polygon(frame,'#241d17',paletteAt(doorZ).edge);
  const door=[project(-1.02,doorZ-.03,.04),project(1.02,doorZ-.03,.04),project(1.02,doorZ-.03,2.98),project(-1.02,doorZ-.03,2.98)];
- polygon(door,'#3b4032','#a09369');
+ polygon(door,paletteAt(doorZ).doorFace,paletteAt(doorZ).edge);
  const panel=[project(-.82,doorZ-.05,.28),project(.82,doorZ-.05,.28),project(.82,doorZ-.05,2.72),project(-.82,doorZ-.05,2.72)];
- polygon(panel,'#30372d','#626044');
+ polygon(panel,paletteAt(doorZ).panel,paletteAt(doorZ).edge);
  const handle=project(.72,doorZ-.09,1.35);
  if(handle){ctx.fillStyle='#c1ac72';ctx.beginPath();ctx.arc(handle.x,handle.y,Math.max(1.2,handle.scale*.025),0,Math.PI*2);ctx.fill()}
  const sign=project(0,doorZ-.08,3.27);
@@ -301,11 +328,11 @@ function drawPixelCanvasText(text,x,baseline,font,color,align){
 function draw(){
  ctx.save();
  if(shake>0){ctx.translate(rand(-shake,shake),rand(-shake,shake));shake*=.84}
- const ceiling=ctx.createLinearGradient(0,0,0,HORIZON);ceiling.addColorStop(0,'#050807');ceiling.addColorStop(1,'#151914');
+ const ceiling=ctx.createLinearGradient(0,0,0,HORIZON);ceiling.addColorStop(0,'#17130f');ceiling.addColorStop(1,'#353026');
  ctx.fillStyle=ceiling;ctx.fillRect(0,0,W,HORIZON+2);
- const floorShade=ctx.createLinearGradient(0,HORIZON,0,H);floorShade.addColorStop(0,'#20231e');floorShade.addColorStop(1,'#080b09');
+ const floorShade=ctx.createLinearGradient(0,HORIZON,0,H);floorShade.addColorStop(0,'#37352b');floorShade.addColorStop(1,'#171713');
  ctx.fillStyle=floorShade;ctx.fillRect(0,HORIZON,W,H-HORIZON);
- drawFloor();drawSideWalls();drawEndDoor();drawA1();
+ drawCeiling();drawFloor();drawSideWalls();drawEndDoor();drawA1();
  ctx.restore();
  ctx.save();
  const darkness=ctx.createRadialGradient(W/2,H*.58,35,W/2,H*.58,flashlight?410:225);
