@@ -8,7 +8,7 @@
 <style>
 :root{color-scheme:dark;--bg:#080909;--panel:#111514;--line:#343b36;--text:#c2b88d;--muted:#a99a70;--amber:#c2b88d}
 *{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;min-height:100%;overflow:hidden;background:#000;color:var(--text);font:14px/1.45 "Segoe UI",Arial,Helvetica,sans-serif;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;text-rendering:optimizeLegibility}body{display:block;padding:0}.shell{position:fixed;inset:0;width:100vw;height:100dvh}header{display:none}.gameframe{position:absolute;inset:0;border:0;background:#000;box-shadow:none;overflow:hidden}canvas{display:block;width:100%;height:100%;aspect-ratio:auto;image-rendering:auto;cursor:crosshair}.hud{position:absolute;inset:0;display:block;pointer-events:none;background:transparent;border:0;padding:0;color:#c2b88d;font-size:12px;text-shadow:0 1px 4px #000}.hud strong{color:#c2b88d}.meter{display:flex;gap:8px;align-items:center}.pip{width:9px;height:9px;background:#6d796c;display:inline-block}.pip.off{background:#292e2b}.overlay{position:absolute;inset:0;display:grid;place-items:center;background:#030505d9;padding:20px;text-align:center}.dialog{width:min(440px,100%);padding:28px;background:#0d1210ed;border:1px solid #465047;box-shadow:0 15px 60px #000}.eyebrow{color:var(--amber);letter-spacing:.25em;font-size:10px}.dialog h1{font-size:clamp(30px,6vw,54px);line-height:1;margin:12px 0;color:#c2b88d;letter-spacing:.06em}.dialog p{color:#c2b88d;font-size:12px;max-width:340px;margin:12px auto 20px}.btn{border:1px solid #8c805e;background:#242318;color:#c2b88d;padding:11px 24px;font:inherit;letter-spacing:.12em;cursor:pointer}.btn:hover{background:#343a2b}.hint{font-size:10px;color:#a99a70;margin-top:16px}.controls{display:flex;gap:18px;flex-wrap:wrap;margin-top:12px;color:#707a70;font-size:10px}button:focus-visible{outline:2px solid var(--amber);outline-offset:3px}
-.room-label{position:absolute;top:18px;left:22px;width:180px;height:27px;image-rendering:pixelated;image-rendering:crisp-edges;display:block}.roblox-health{display:none;position:absolute;right:22px;top:58px;left:auto;bottom:auto;width:190px;padding:0;background:transparent;border:0;border-radius:0;box-shadow:none}.health-track{height:12px;background:#252b28;border:1px solid #ffffff55;border-radius:999px;overflow:hidden;box-shadow:0 1px 5px #0009}.health-fill{height:100%;width:100%;border-radius:999px;background:linear-gradient(#71e36b,#279c38);transition:width .18s ease,background .18s ease}.game-status{position:absolute;top:18px;left:50%;transform:translateX(-50%);color:#c2b88d;text-shadow:0 2px 5px #000;font-size:11px;letter-spacing:.12em}.game-actions{position:absolute;right:18px;top:16px;display:flex;gap:7px;pointer-events:auto}.game-actions .btn{padding:6px 10px;font-size:10px;background:#17150dcc;border:1px solid #8c805e88;border-radius:4px;color:#c2b88d;text-shadow:0 1px 3px #000}.controls{position:absolute;left:50%;bottom:10px;transform:translateX(-50%);margin:0;justify-content:center;white-space:nowrap;color:#c2b88d;text-shadow:0 1px 4px #000;font-size:9px;opacity:.65;pointer-events:none}.overlay{z-index:5}.dialog{border-radius:4px}@media(max-width:600px){.room-label{top:12px;left:12px}.roblox-health{right:12px;top:52px;width:150px}.game-actions{right:10px;top:10px}.game-status{top:55px}.controls{display:none}}
+.room-label{position:absolute;top:18px;left:22px;width:180px;height:27px;image-rendering:pixelated;image-rendering:crisp-edges;display:block}.pixel-text-canvas{display:inline-block;image-rendering:pixelated;image-rendering:crisp-edges;vertical-align:middle;max-width:100%}.roblox-health{display:none;position:absolute;right:22px;top:58px;left:auto;bottom:auto;width:190px;padding:0;background:transparent;border:0;border-radius:0;box-shadow:none}.health-track{height:12px;background:#252b28;border:1px solid #ffffff55;border-radius:999px;overflow:hidden;box-shadow:0 1px 5px #0009}.health-fill{height:100%;width:100%;border-radius:999px;background:linear-gradient(#71e36b,#279c38);transition:width .18s ease,background .18s ease}.game-status{position:absolute;top:18px;left:50%;transform:translateX(-50%);color:#c2b88d;text-shadow:0 2px 5px #000;font-size:11px;letter-spacing:.12em}.game-actions{position:absolute;right:18px;top:16px;display:flex;gap:7px;pointer-events:auto}.game-actions .btn{padding:6px 10px;font-size:10px;background:#17150dcc;border:1px solid #8c805e88;border-radius:4px;color:#c2b88d;text-shadow:0 1px 3px #000}.controls{position:absolute;left:50%;bottom:10px;transform:translateX(-50%);margin:0;justify-content:center;white-space:nowrap;color:#c2b88d;text-shadow:0 1px 4px #000;font-size:9px;opacity:.65;pointer-events:none}.overlay{z-index:5}.dialog{border-radius:4px}@media(max-width:600px){.room-label{top:12px;left:12px}.roblox-health{right:12px;top:52px;width:150px}.game-actions{right:10px;top:10px}.game-status{top:55px}.controls{display:none}}
 </style>
 </head>
 <body>
@@ -29,6 +29,92 @@ const player={x:480,y:390,r:10,speed:172,face:0};
 const walls=[{x:95,y:70,w:770,h:34},{x:95,y:436,w:770,h:34},{x:95,y:70,w:34,h:400},{x:831,y:70,w:34,h:400}];
 const rand=(a,b)=>a+Math.random()*(b-a);
 function sound(freq=180,dur=.08,type='sine',vol=.035){if(mute)return;try{audio=audio||new(window.AudioContext||window.webkitAudioContext)();const o=audio.createOscillator(),g=audio.createGain();o.type=type;o.frequency.value=freq;g.gain.value=vol;o.connect(g);g.connect(audio.destination);o.start();g.gain.exponentialRampToValueAtTime(.001,audio.currentTime+dur);o.stop(audio.currentTime+dur)}catch{}}
+function pixelMeasure(ctx,text,spacing){let width=0;for(let i=0;i<text.length;i++)width+=ctx.measureText(text[i]).width;if(text.length>1)width+=spacing*(text.length-1);return width}
+function pixelDrawLine(ctx,text,x,y,spacing){let cursor=x;for(const char of text){ctx.fillText(char,cursor,y);cursor+=ctx.measureText(char).width+spacing}}
+function pixelizeElement(el){
+const text=el.textContent.trim();
+if(!text)return;
+const style=getComputedStyle(el);
+const size=parseFloat(style.fontSize)||12;
+const lineHeight=parseFloat(style.lineHeight)||size*1.25;
+const spacing=style.letterSpacing==='normal'?0:parseFloat(style.letterSpacing)||0;
+const scale=.62;
+const measure=document.createElement('canvas').getContext('2d');
+measure.font=style.font||`${style.fontWeight} ${size}px ${style.fontFamily}`;
+const paragraph=el.tagName==='P';
+const maxWidth=paragraph?Math.max(150,el.clientWidth||340):Infinity;
+const words=text.split(/\s+/);
+const lines=[];
+let line='';
+for(const word of words){
+const candidate=line?line+' '+word:word;
+if(paragraph&&line&&pixelMeasure(measure,candidate,spacing)>maxWidth){lines.push(line);line=word}else line=candidate;
+}
+if(line)lines.push(line);
+const measuredWidth=Math.max(...lines.map(value=>pixelMeasure(measure,value,spacing)),1);
+const cssWidth=paragraph?maxWidth:Math.ceil(measuredWidth+4);
+const cssHeight=Math.ceil(lines.length*lineHeight+2);
+const raster=document.createElement('canvas');
+raster.className='pixel-text-canvas';
+raster.width=Math.max(1,Math.ceil(cssWidth*scale));
+raster.height=Math.max(1,Math.ceil(cssHeight*scale));
+raster.style.width=cssWidth+'px';
+raster.style.height=cssHeight+'px';
+if(paragraph){raster.style.display='block';raster.style.margin='0 auto'}
+const paint=raster.getContext('2d');
+paint.scale(scale,scale);
+paint.font=measure.font;
+paint.fillStyle=style.color;
+paint.textBaseline='alphabetic';
+const align=style.textAlign;
+lines.forEach((value,index)=>{
+const width=pixelMeasure(paint,value,spacing);
+let x=align==='center'?(cssWidth-width)/2:align==='right'?cssWidth-width:0;
+pixelDrawLine(paint,value,x, index*lineHeight+size,spacing);
+});
+el.setAttribute('aria-label',text);
+el.replaceChildren(raster);
+}
+function installPixelText(){
+const targets=document.querySelectorAll('#status,#mute,#pause,.controls span,.eyebrow,.dialog h1,.dialog p,#start,.hint');
+targets.forEach(el=>{
+pixelizeElement(el);
+const observer=new MutationObserver(()=>{
+if(el.children.length===1&&el.firstElementChild?.classList.contains('pixel-text-canvas'))return;
+pixelizeElement(el);
+});
+observer.observe(el,{childList:true,characterData:true,subtree:true});
+});
+}
+const pixelCanvasCache=new Map();
+function drawPixelText(text,x,baseline,font,color,align='left'){
+const key=[text,font,color].join('|');
+let item=pixelCanvasCache.get(key);
+if(!item){
+const measure=document.createElement('canvas').getContext('2d');
+measure.font=font;
+const size=parseFloat(font.match(/[0-9.]+px/)?.[0]||'13');
+const width=Math.ceil(measure.measureText(text).width+6);
+const height=Math.ceil(size*1.8);
+const scale=.62;
+const raster=document.createElement('canvas');
+raster.width=Math.ceil(width*scale);
+raster.height=Math.ceil(height*scale);
+const paint=raster.getContext('2d');
+paint.scale(scale,scale);
+paint.font=font;
+paint.fillStyle=color;
+paint.textBaseline='alphabetic';
+paint.fillText(text,3,size*1.25);
+item={canvas:raster,width,height,baseline:size*1.25};
+pixelCanvasCache.set(key,item);
+}
+const left=align==='center'?x-item.width/2:align==='right'?x-item.width:x;
+ctx.save();
+ctx.imageSmoothingEnabled=false;
+ctx.drawImage(item.canvas,left,baseline-item.baseline,item.width,item.height);
+ctx.restore();
+}
 function updateHud(){roomLabelCtx.clearRect(0,0,120,18);roomLabelCtx.fillStyle='#c2b88d';roomLabelCtx.font='700 10px Arial,Helvetica,sans-serif';roomLabelCtx.textBaseline='alphabetic';let labelX=0;for(const char of 'ROOM '+String(room).padStart(3,'0')){roomLabelCtx.fillText(char,labelX,12);labelX+=roomLabelCtx.measureText(char).width+.9}const value=Math.max(0,Math.round(health/3*100));const bar=document.getElementById('roblox-health');bar.style.display=value<100?'block':'none';const fill=document.getElementById('health-fill');fill.style.width=value+'%';fill.style.background=value<=33?'linear-gradient(#ff7777,#b51f1f)':value<=66?'linear-gradient(#f5d66b,#c28a22)':'linear-gradient(#71e36b,#279c38)'}
 function start(){overlay.style.display='none';running=true;paused=false;dead=false;room=0;health=3;player.x=480;player.y=390;entity=null;entityTimer=0;updateHud();statusEl.textContent='LISTEN';sound(260,.12);last=performance.now();requestAnimationFrame(loop)}
 function showOverlay(title,copy,button){overlay.style.display='grid';overlay.querySelector('.eyebrow').textContent='ROOM '+String(room).padStart(3,'0');overlay.querySelector('h1').textContent=title;overlay.querySelector('p').textContent=copy;startBtn.textContent=button}
@@ -53,7 +139,7 @@ ctx.fillStyle='#1a201b';ctx.fillRect(160,132,640,276);
 for(let i=0;i<15;i++){ctx.fillStyle=i%2?'#252a23':'#222720';ctx.fillRect(165+i*43,135,2,266)}
 ctx.fillStyle='#151a16';ctx.fillRect(129,104,702,16);ctx.fillRect(129,420,702,16);
 ctx.fillStyle='#34382c';ctx.fillRect(455,95,50,8);ctx.fillStyle='#b0a176';ctx.fillRect(474,97,12,3);
-ctx.fillStyle='#0b0f0c';ctx.fillRect(440,114,80,10);ctx.fillStyle='#d0c49b';ctx.font='600 13px Arial,Helvetica,sans-serif';ctx.textAlign='center';ctx.fillText(String(room+1).padStart(3,'0'),480,110);
+ctx.fillStyle='#0b0f0c';ctx.fillRect(440,114,80,10);ctx.fillStyle='#d0c49b';drawPixelText(String(room+1).padStart(3,'0'),480,110,'600 13px Arial,Helvetica,sans-serif','#d0c49b','center');
 ctx.fillStyle='#0a0d0b';ctx.fillRect(145,118,54,80);ctx.fillRect(761,118,54,80);
 ctx.fillStyle='#41463a';ctx.fillRect(150,123,44,70);ctx.fillRect(766,123,44,70);ctx.fillStyle='#8c805e';ctx.fillRect(184,155,4,6);ctx.fillRect(766,155,4,6);
 ctx.fillStyle='#171c17';ctx.fillRect(150,360,60,54);ctx.fillRect(750,360,60,54);
@@ -67,9 +153,10 @@ ctx.strokeStyle='#9fa995';ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(player.x,pl
 ctx.restore();
 ctx.save();ctx.fillStyle='#000';ctx.fillRect(0,0,W,H);ctx.globalCompositeOperation='destination-out';const radius=flash?170:105;const g=ctx.createRadialGradient(player.x,player.y,20,player.x,player.y,radius);g.addColorStop(0,'rgba(0,0,0,1)');g.addColorStop(.62,'rgba(0,0,0,.85)');g.addColorStop(1,'rgba(0,0,0,0)');ctx.fillStyle=g;ctx.beginPath();ctx.arc(player.x,player.y,radius,0,Math.PI*2);ctx.fill();ctx.restore();
 ctx.fillStyle='#c2b88d';ctx.font='600 13px Arial,Helvetica,sans-serif';ctx.textAlign='left';
-if(entity&&entity.kind==='RUSH'&&entity.age<entity.warning){ctx.fillStyle='#c2b88d';ctx.font='600 13px Arial,Helvetica,sans-serif';ctx.textAlign='center';ctx.fillText('HIDE — SOMETHING IS APPROACHING',480,485)}
+if(entity&&entity.kind==='RUSH'&&entity.age<entity.warning){drawPixelText('HIDE — SOMETHING IS APPROACHING',480,485,'600 13px Arial,Helvetica,sans-serif','#c2b88d','center')}
 }
 function loop(t){if(!running||paused)return;const dt=Math.min((t-last)/1000,.04);last=t;update(dt);draw();requestAnimationFrame(loop)}
+installPixelText();
 start();
 })();
 </script>
