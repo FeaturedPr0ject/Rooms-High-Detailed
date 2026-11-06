@@ -102,7 +102,7 @@ function updateHud(){
  healthFill.style.background=percent<=33?'linear-gradient(#ff7777,#b51f1f)':percent<=66?'linear-gradient(#f5d66b,#c28a22)':'linear-gradient(#71e36b,#279c38)';
 }
 function showOverlay(title,copy,button,eyebrow){
- overlayTitle.textContent=title;overlayCopy.textContent=copy;resumeBtn.textContent=button;overlayEyebrow.textContent=eyebrow||'ROOM '+String(room).padStart(3,'0');
+ overlayTitle.textContent=title;overlayCopy.textContent=copy;resumeBtn.textContent=button;overlayEyebrow.textContent=eyebrow||'ROOM A-'+String(room).padStart(3,'0');
  overlay.style.display='grid';
  for(const el of [overlayTitle,overlayCopy,resumeBtn,overlayEyebrow])if(!el.querySelector('.pixel-text-canvas'))pixelizeElement(el);
 }
@@ -305,13 +305,8 @@ function drawA1SpriteAt(worldX,worldZ,height,alpha){
 }
 function drawA1(){
  if(!entity)return;
- if(entity.phase==='stare'){drawA1SpriteAt(entity.x,entity.z,3.05,.98);return}
- for(let i=3;i>=1;i--)drawA1SpriteAt(entity.x,entity.z+i*1.15,3.05,.11/i);
- drawA1SpriteAt(entity.x,entity.z,3.05,.98);
- const sign=project(entity.x,entity.z,3.45);
- if(sign&&entity.age%1.4<.45){
-  ctx.save();ctx.globalAlpha=.55;ctx.fillStyle='#c2b88d';ctx.font='700 12px Arial';ctx.textAlign='center';ctx.fillText('HA!',sign.x,sign.y-8);ctx.restore();
- }
+ const flicker=.92+Math.sin(entity.age*19)*.08;
+ drawA1SpriteAt(entity.x,entity.z,3.05,entity.phase==='stare'?.98:flicker);
 }
 function drawPixelCanvasText(text,x,baseline,font,color,align){
  const temp=document.createElement('canvas'),measure=temp.getContext('2d');measure.font=font;
