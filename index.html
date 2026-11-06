@@ -196,7 +196,7 @@ const ROOM_MATERIAL={
  floor:['#536d59','#607a64','#49634f','#71846a'],floorSeam:'#263d30',
  ceiling:['#c4c8c2','#b4b9b4'],door:'#765b3e',doorFace:'#9a7952',panel:'#b08c5c',doorEdge:'#d7bf84'
 };
-const ENTITY_SPAWN_RATES=Object.freeze({'A-1':1/15});
+const ENTITY_SPAWN_RATES=Object.freeze({'A-1':0.20});
 function paletteAt(z){return ROOM_MATERIAL}
 function getEntitySpawnRate(entityId){return ENTITY_SPAWN_RATES[entityId]??0}
 function drawFloor(){
