@@ -110,10 +110,15 @@ function onKey(e,down){
  if(e.target&&e.target.closest&&e.target.closest('#admin-panel'))return;
  const key=e.key.toLowerCase();
  if(key===' ')e.preventDefault();
+ if(key==='e'){
+  if(!down||e.repeat)return;
+  e.preventDefault();
+  interact();
+  return;
+ }
  keys[key]=down;
  if(!down)return;
  if(key==='escape'){togglePause();return}
- if(key==='e'){interact();return}
  if(key==='f'){flashlight=!flashlight;sound(420,.045);return}
 }
 window.addEventListener('keydown',e=>onKey(e,true));
@@ -340,7 +345,7 @@ function findNearbyCloset(){
   const closet=closetForRoom(n),distance=Math.hypot(player.x-closet.x,player.z-closet.z);
   if(distance<best){best=distance;closest=closet}
  }
- return best<2.1?closest:null;
+ return best<3.25?closest:null;
 }
 function deskForRoom(roomNumber,slot){
  const z=roomNumber*ROOM_LENGTH+(slot===0?18.5:26);
