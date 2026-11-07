@@ -19,6 +19,14 @@ body{padding:0}.shell{position:fixed;inset:0;width:100vw;height:100dvh;backgroun
 .actions{position:absolute;right:18px;top:54px;display:flex;gap:7px;pointer-events:auto}
 .btn{padding:6px 10px;font:inherit;font-size:10px;letter-spacing:.1em;color:var(--gold);background:#17150dcc;border:1px solid #8c805e88;border-radius:4px;cursor:pointer;text-shadow:0 1px 3px #000}
 .btn:hover{background:#34301e}
+.admin-panel{display:none;position:absolute;z-index:6;right:18px;top:94px;width:min(280px,calc(100vw - 24px));padding:14px;background:#0d1210f2;border:1px solid #8c805e88;box-shadow:0 12px 34px #000b;color:var(--gold);pointer-events:auto}
+.admin-panel form{display:grid;gap:9px}
+.admin-panel label{font-size:10px;letter-spacing:.16em}
+.admin-panel input{width:100%;padding:9px 10px;background:#050807;border:1px solid #71694e;color:var(--gold);font:inherit;outline:none}
+.admin-panel input:focus{border-color:#c2b88d}
+.admin-panel-actions{display:flex;gap:8px}
+.admin-panel-actions .btn{flex:1}
+.admin-note{font-size:10px;opacity:.65}
 .controls{position:absolute;left:50%;bottom:13px;transform:translateX(-50%);display:flex;gap:15px;white-space:nowrap;font-size:9px;letter-spacing:.05em;color:var(--gold);text-shadow:0 1px 4px #000;opacity:.72}
 .overlay{position:absolute;inset:0;z-index:5;display:none;place-items:center;background:#030505d9;padding:20px;text-align:center}
 .dialog{width:min(440px,100%);padding:28px;background:#0d1210ed;border:1px solid #665d43;box-shadow:0 15px 60px #000}
@@ -26,7 +34,7 @@ body{padding:0}.shell{position:fixed;inset:0;width:100vw;height:100dvh;backgroun
 .dialog p{color:var(--gold);font-size:12px;max-width:340px;margin:12px auto 20px}
 .eyebrow{color:var(--gold);letter-spacing:.25em;font-size:10px}
 .pixel-text-canvas{display:inline-block;image-rendering:pixelated;image-rendering:crisp-edges;vertical-align:middle;max-width:100%}
-@media(max-width:700px){.room-label{top:12px;left:12px}.health-wrap{right:12px;top:48px;width:145px}.actions{right:10px;top:10px}.status{top:55px}.controls{font-size:8px;gap:7px;bottom:8px;white-space:normal;text-align:center;width:94%;justify-content:center;flex-wrap:wrap}}
+@media(max-width:700px){.room-label{top:12px;left:12px}.health-wrap{right:12px;top:48px;width:145px}.actions{right:10px;top:10px}.status{top:55px}.controls{font-size:8px;gap:7px;bottom:8px;white-space:normal;text-align:center;width:94%;justify-content:center;flex-wrap:wrap}.admin-panel{right:10px;top:55px}}
 </style>
 </head>
 <body>
@@ -38,11 +46,12 @@ body{padding:0}.shell{position:fixed;inset:0;width:100vw;height:100dvh;backgroun
 <canvas id="room-label" class="room-label" width="150" height="23" aria-label="Room counter"></canvas>
 <div class="health-wrap" id="health-wrap"><div class="health-track"><div class="health-fill" id="health-fill"></div></div></div>
 <div class="status" id="status">LISTEN</div>
-<div class="actions"><button class="btn" id="mute">SOUND ON</button><button class="btn" id="pause">PAUSE</button></div>
+<div class="actions"><button class="btn" id="admin-toggle" type="button">ADMIN</button><button class="btn" id="mute">SOUND ON</button><button class="btn" id="pause">PAUSE</button></div>
 <div class="controls">
 <span>W / S — MOVE</span><span>A / D — STRAFE</span><span>RIGHT MOUSE + DRAG — LOOK UP / DOWN / AROUND</span><span>E — HIDE / OPEN DOOR / EXIT</span><span>F — FLASHLIGHT</span><span>SHIFT — RUN</span>
 </div>
 </section>
+<div class="admin-panel" id="admin-panel" aria-hidden="true"><form id="admin-form"><label for="admin-room">TELEPORT TO ROOM</label><input id="admin-room" name="room" type="number" min="0" max="999" step="1" value="0" inputmode="numeric"><div class="admin-panel-actions"><button class="btn" type="submit">TELEPORT</button><button class="btn" id="admin-close" type="button">CLOSE</button></div><div class="admin-note">Enter 0 for Lobby or a room number from 1 to 999.</div></form></div>
 <div class="overlay" id="overlay"><div class="dialog"><div class="eyebrow" id="overlay-eyebrow">ROOM 000</div><h1 id="overlay-title">PAUSED</h1><p id="overlay-copy">The hallway is waiting.</p><button class="btn" id="resume">RESUME</button></div></div>
 </main>
 <script src="./game.js" defer></script>
