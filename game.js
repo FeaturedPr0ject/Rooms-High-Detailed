@@ -8,10 +8,13 @@ const roomLabel=document.getElementById('room-label'),roomCtx=roomLabel.getConte
 const statusEl=document.getElementById('status'),healthWrap=document.getElementById('health-wrap'),healthFill=document.getElementById('health-fill');
 const overlay=document.getElementById('overlay'),overlayTitle=document.getElementById('overlay-title'),overlayCopy=document.getElementById('overlay-copy'),overlayEyebrow=document.getElementById('overlay-eyebrow'),resumeBtn=document.getElementById('resume'),muteBtn=document.getElementById('mute'),pauseBtn=document.getElementById('pause');
 const adminToggle=document.getElementById('admin-toggle'),adminPanel=document.getElementById('admin-panel'),adminForm=document.getElementById('admin-form'),adminRoomInput=document.getElementById('admin-room'),adminClose=document.getElementById('admin-close'),adminEntitySelect=document.getElementById('admin-entity'),adminSpawnButton=document.getElementById('admin-spawn'),adminFeedback=document.getElementById('admin-feedback');
-let room=0,health=100,flashlight=true,running=true,paused=false,dead=false,mute=false,last=0,audio=null,shake=0;
+let room=0,furthestRoom=0,health=100,flashlight=true,running=true,paused=false,dead=false,mute=false,last=0,audio=null,shake=0;
 let keys=Object.create(null),entity=null,entityCooldown=0,doorHint=false,mouseTurn=0,isHiding=false,hidingCloset=null,hidingType=null;
 let a25Started=false,a25Completed=false;
 const player={x:0,z:5,yaw:0,speed:3.25};
+const doorStates=new Map();
+function retainedRoomFloor(){return Math.max(0,furthestRoom-ROOMS_KEPT_BEHIND)}
+function doorIsOpen(boundary){const state=doorStates.get(boundary);return !!state&&state.angle>=1.12}
 let viewPitch=0,rightDragging=false,lastPointerX=0,lastPointerY=0;
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 const rand=(a,b)=>a+Math.random()*(b-a);
@@ -65,7 +68,7 @@ function showOverlay(title,copy,button,eyebrow){
 }
 function hideOverlay(){overlay.style.display='none'}
 function startNewRun(){
- room=0;health=100;player.x=0;player.z=5;player.yaw=0;viewPitch=0;entity=null;entityCooldown=0;a25Started=false;a25Completed=false;isHiding=false;hidingCloset=null;hidingType=null;dead=false;paused=false;running=true;keys=Object.create(null);
+ room=0;furthestRoom=0;doorStates.clear();health=100;player.x=0;player.z=5;player.yaw=0;viewPitch=0;entity=null;entityCooldown=0;a25Started=false;a25Completed=false;isHiding=false;hidingCloset=null;hidingType=null;dead=false;paused=false;running=true;keys=Object.create(null);
  updateHud();setStatus('LOBBY');hideOverlay();last=performance.now();sound(250,.12);requestAnimationFrame(loop);
 }
 function togglePause(){
@@ -83,14 +86,13 @@ function startA25Encounter(targetRoom){
  a25Started=true;a25Completed=false;entityCooldown=0;
  const targetEnd=(targetRoom+1)*ROOM_LENGTH-.8;
  entity={type:'A-25',x:0,z:targetRoom*ROOM_LENGTH+ROOM_LENGTH*.5,age:0,direction:1,targetRoom,targetZ:targetEnd,rebounds:0,particleTimer:0,particles:[],speed:A25_SPEED};
- setStatus('A-25 ENTERED FROM THE LOBBY — HIDE IN A STEEL CABINET');
+ setStatus('A-25 SPAWNED IN ROOM A-'+String(targetRoom).padStart(3,'0')+' — HIDE NOW');
  sound(62,.8,'sawtooth',.035);
 }
 function teleportToRoom(targetRoom){
  if(!Number.isInteger(targetRoom)||targetRoom<0||targetRoom>999){setStatus('INVALID ROOM NUMBER');return}
- room=targetRoom;player.x=0;player.z=room*ROOM_LENGTH+1.1;player.yaw=0;
+ room=targetRoom;furthestRoom=targetRoom;doorStates.clear();player.x=0;player.z=room*ROOM_LENGTH+1.1;player.yaw=0;
  keys=Object.create(null);doorHint=false;isHiding=false;hidingCloset=null;hidingType=null;entityCooldown=0;
- 
  updateHud();setStatus('TELEPORTED TO '+(room===0?'LOBBY':'ROOM A-'+String(room).padStart(3,'0')));
  adminPanel.style.display='none';adminPanel.setAttribute('aria-hidden','true');
 }
@@ -114,18 +116,34 @@ function spawnAdminEntity(){
  adminPanel.style.display='none';adminPanel.setAttribute('aria-hidden','true');
  sound(selected==='A-25'?62:118,.35,'sawtooth',.028);
 }
-function nextRoom(){
- const doorZ=(room+1)*ROOM_LENGTH;
- if(doorZ-player.z>2.35){setStatus('DOOR IS TOO FAR');return}
- room++;player.z=doorZ+1.1;player.x=0;doorHint=false;
- sound(330,.08);setTimeout(()=>sound(220,.14),80);updateHud();setStatus('ROOM ENTERED');
- if(!entity&&Math.random()<.32){
-  startA25Encounter(room);
-  return;
- }
+function openDoor(direction){
+ const boundary=direction>0?(room+1)*ROOM_LENGTH:room*ROOM_LENGTH;
+ if(direction<0&&room<=retainedRoomFloor()){setStatus('PREVIOUS ROOM IS NO LONGER STORED');return false}
+ const distance=direction>0?boundary-player.z:player.z-boundary;
+ if(distance>2.8||distance<-.05){setStatus('DOOR IS TOO FAR');return false}
+ let state=doorStates.get(boundary);
+ if(!state){state={angle:0,swing:direction};doorStates.set(boundary,state)}
+ else if(state.angle<.25)state.swing=direction;
+ if(state.angle<1.12){setStatus('DOOR OPENING');sound(215,.16,'triangle',.025)}
+ else setStatus('DOOR OPEN — WALK THROUGH');
+ doorHint=true;
+ return true;
+}
+function nearbyDoor(){
+ const candidates=[];
+ const frontBoundary=(room+1)*ROOM_LENGTH,frontDistance=frontBoundary-player.z;
+ if(frontDistance>=-.05&&frontDistance<=2.8)candidates.push({direction:1,distance:frontDistance});
+ const backBoundary=room*ROOM_LENGTH,backDistance=player.z-backBoundary;
+ if(room>retainedRoomFloor()&&backDistance>=-.05&&backDistance<=2.8)candidates.push({direction:-1,distance:backDistance});
+ candidates.sort((a,b)=>a.distance-b.distance);
+ return candidates[0]||null;
+}
+function handleRoomEntered(nextRoomNumber){
+ setStatus('ROOM A-'+String(nextRoomNumber).padStart(3,'0')+' ENTERED');
+ if(!entity&&Math.random()<.32){startA25Encounter(nextRoomNumber);return}
  const spawnRate=getEntitySpawnRate('A-1');
  if(!entity&&entityCooldown<=0&&Math.random()<spawnRate){
-  entity={type:'A-1',x:rand(-.22,.22),z:(room+1)*ROOM_LENGTH-1.4,age:0,phase:'stare',stareTime:rand(1.3,2.2),speed:ROOM_LENGTH*.58,damaged:false,damageTimer:0,cloneTimer:.08,clones:[]};
+  entity={type:'A-1',x:rand(-.22,.22),z:(nextRoomNumber+1)*ROOM_LENGTH-1.4,age:0,phase:'stare',stareTime:rand(1.3,2.2),speed:ROOM_LENGTH*.58,damaged:false,damageTimer:0,cloneTimer:.08,clones:[]};
   setStatus('A-1 IS WATCHING');sound(118,.42,'sawtooth',.018);
  }
 }
@@ -169,21 +187,37 @@ canvas.addEventListener('pointermove',e=>{if(!rightDragging)return;const dx=e.cl
 const stopRightDrag=()=>{rightDragging=false};
 canvas.addEventListener('pointerup',stopRightDrag);canvas.addEventListener('pointercancel',stopRightDrag);
 function update(dt){
+ for(const state of doorStates.values())state.angle=Math.min(1.35,state.angle+dt*3.4);
  if(!isHiding){
   const forward=(keys.w?1:0)-(keys.s?1:0),strafe=(keys.d?1:0)-(keys.a?1:0);
   const speed=player.speed*(keys.shift?1.45:1),length=Math.hypot(forward,strafe)||1;
   const f=forward/length*speed*dt,s=strafe/length*speed*dt;
-  player.x+=Math.cos(player.yaw)*s+Math.sin(player.yaw)*f;
-  player.z+=Math.cos(player.yaw)*f-Math.sin(player.yaw)*s;
-  const half=halfWidthAt(player.z);
-  player.x=clamp(player.x,-half+.65,half-.65);
-  const doorZ=(room+1)*ROOM_LENGTH;
-  player.z=clamp(player.z,room*ROOM_LENGTH+.45,doorZ-.8);
-  const nearby=findNearbyCloset(),nearbyDesk=findNearbyDesk(),distance=doorZ-player.z;
+  const nextX=player.x+Math.cos(player.yaw)*s+Math.sin(player.yaw)*f;
+  let nextZ=player.z+Math.cos(player.yaw)*f-Math.sin(player.yaw)*s;
+  const oldRoom=Math.max(0,Math.floor(player.z/ROOM_LENGTH));
+  const targetRoom=Math.max(0,Math.floor(Math.max(0,nextZ)/ROOM_LENGTH));
+  if(targetRoom>oldRoom){
+   const boundary=(oldRoom+1)*ROOM_LENGTH;
+   if(!doorIsOpen(boundary)||Math.abs(nextX)>.48)nextZ=Math.min(nextZ,boundary-.8);
+  }else if(targetRoom<oldRoom){
+   const boundary=oldRoom*ROOM_LENGTH;
+   if(!doorIsOpen(boundary)||Math.abs(nextX)>.48)nextZ=Math.max(nextZ,boundary+.8);
+  }
+  nextZ=Math.max(nextZ,retainedRoomFloor()*ROOM_LENGTH+.45);
+  const half=halfWidthAt(nextZ);
+  player.x=clamp(nextX,-half+.65,half-.65);
+  player.z=nextZ;
+  const nextRoomIndex=Math.max(0,Math.floor(player.z/ROOM_LENGTH));
+  if(nextRoomIndex!==room){
+   const previousRoom=room;room=nextRoomIndex;updateHud();doorHint=false;delete statusEl.dataset.state;
+   if(room>furthestRoom){furthestRoom=room;handleRoomEntered(room)}
+   else setStatus('RETURNED TO '+(room===0?'LOBBY':'ROOM A-'+String(room).padStart(3,'0')));
+  }
+  const nearby=findNearbyCloset(),nearbyDesk=findNearbyDesk(),door=nearbyDoor();
   if(nearby){if(statusEl.dataset.state!=='closet'){setStatus('PRESS E TO ENTER STEEL CABINET');statusEl.dataset.state='closet'}}
   else if(nearbyDesk){if(statusEl.dataset.state!=='desk'){setStatus('PRESS E TO HIDE UNDER DESK');statusEl.dataset.state='desk'}}
-  else if(distance<2.6){if(!doorHint){setStatus('PRESS E TO OPEN DOOR');doorHint=true;statusEl.dataset.state='door'}}
-  else if(doorHint||statusEl.dataset.state==='closet'||statusEl.dataset.state==='desk'){setStatus(room===0?'LOBBY':'LISTEN');doorHint=false;delete statusEl.dataset.state}
+  else if(door){if(statusEl.dataset.state!=='door'){setStatus('PRESS E TO OPEN DOOR');doorHint=true;statusEl.dataset.state='door'}}
+  else if(doorHint||statusEl.dataset.state==='closet'||statusEl.dataset.state==='desk'||statusEl.dataset.state==='door'){setStatus(room===0?'LOBBY':'LISTEN');doorHint=false;delete statusEl.dataset.state}
  }else if(statusEl.dataset.state!=='hidden'){
   setStatus('HIDDEN — PRESS E TO EXIT');statusEl.dataset.state='hidden';
  }
@@ -322,7 +356,7 @@ const ENTITY_SPAWN_RATES=Object.freeze({'A-1':0.20});
 function paletteAt(z){return ROOM_MATERIAL}
 function getEntitySpawnRate(entityId){return ENTITY_SPAWN_RATES[entityId]??0}
 function drawFloor(){
- const near=Math.max(0,(room-ROOMS_KEPT_BEHIND)*ROOM_LENGTH),far=player.z+48,boardWidth=.85,boardLength=8;
+ const near=retainedRoomFloor()*ROOM_LENGTH,far=player.z+48,boardWidth=.85,boardLength=8;
  for(let z=Math.floor(far/boardLength)*boardLength;z>=Math.floor(near/boardLength)*boardLength;z-=boardLength){
   const half=halfWidthAt(z);
   for(let x=-half;x<half;x+=boardWidth){
@@ -343,7 +377,7 @@ function drawCeiling(){
  }
 }
 function drawSideWalls(){
- const start=Math.max(0,Math.floor((room-ROOMS_KEPT_BEHIND)*ROOM_LENGTH/2)*2),far=Math.floor((player.z+42)/2)*2;
+ const start=Math.floor(retainedRoomFloor()*ROOM_LENGTH/2)*2,far=Math.floor((player.z+42)/2)*2;
  for(let z=far;z>=start;z-=2){
   const half=halfWidthAt(z);
   for(const side of [-1,1]){
@@ -367,7 +401,7 @@ function drawDesk(desk){
  }
 }
 function drawDesks(){
- for(let n=Math.max(0,room-ROOMS_KEPT_BEHIND);n<=room+1;n++){
+ for(let n=retainedRoomFloor();n<=room+1;n++){
   for(let slot=0;slot<2;slot++)drawDesk(deskForRoom(n,slot));
  }
 }
@@ -379,7 +413,7 @@ function closetForRoom(roomNumber){
 }
 function findNearbyCloset(){
  let closest=null,best=Infinity;
- for(let n=Math.max(0,room-ROOMS_KEPT_BEHIND);n<=room+1;n++){
+ for(let n=retainedRoomFloor();n<=room+1;n++){
   const closet=closetForRoom(n),distance=Math.hypot(player.x-closet.x,player.z-closet.z);
   if(distance<best){best=distance;closest=closet}
  }
@@ -402,7 +436,7 @@ function findNearbyDesk(){
  return best<2.5?closest:null;
 }
 function drawClosets(){
- for(let n=Math.max(0,room-ROOMS_KEPT_BEHIND);n<=room+2;n++){
+ for(let n=retainedRoomFloor();n<=room+1;n++){
   const c=closetForRoom(n),frontX=c.x-c.side*.23,backX=c.x+c.side*.05,z=c.z;
   worldPolygon([[backX,z-.54,0],[frontX,z-.54,0],[frontX,z-.54,2.35],[backX,z-.54,2.35]],'#343b40','#87949a');
   worldPolygon([[backX,z-.54,2.35],[frontX,z-.54,2.35],[frontX,z+.54,2.35],[backX,z+.54,2.35]],'#68747b','#aab5b9');
@@ -413,7 +447,7 @@ function drawClosets(){
   const handle=project(frontX-c.side*.04,z+.3,1.08);
   if(handle){ctx.fillStyle='#e3cb8d';ctx.beginPath();ctx.arc(handle.x,handle.y,Math.max(1,handle.scale*.023),0,Math.PI*2);ctx.fill()}
   const plate=project(frontX-c.side*.045,z,2.43);
-  if(plate){ctx.fillStyle='#c4cdd0';ctx.fillRect(plate.x-7,plate.y-3,14,6);ctx.fillStyle='#283137';ctx.font='bold 5px Arial';ctx.textAlign='center';ctx.fillText('HIDE',plate.x,plate.y+2)}
+  if(plate){ctx.fillStyle='#c4cdd0';ctx.fillRect(plate.x-5,plate.y-2,10,4)}
  }
 }
 function enterHidingSpot(spot){
@@ -426,7 +460,9 @@ function interact(){
  if(isHiding){exitCloset();return}
  const closet=findNearbyCloset();if(closet){enterHidingSpot(closet);return}
  const desk=findNearbyDesk();if(desk){enterHidingSpot(desk);return}
- nextRoom();
+ const door=nearbyDoor();
+ if(door){openDoor(door.direction);return}
+ setStatus('NOTHING TO INTERACT WITH');
 }
 function drawHidingView(){
  if(!isHiding)return;
@@ -451,31 +487,39 @@ function drawHidingView(){
  ctx.fillStyle='rgba(178,191,196,.42)';ctx.fillRect(left-3,0,3,H);ctx.fillRect(left+gap,0,3,H);
  ctx.restore();
 }
+function drawDoorLeaf(boundary,state){
+ const angle=state?state.angle:0,swing=state?state.swing:1,width=1.12,hinge=-.56;
+ const point=(offset,height)=>[hinge+Math.cos(angle)*offset,boundary+swing*Math.sin(angle)*offset,height];
+ worldPolygon([point(0,0),point(width,0),point(width,2.28),point(0,2.28)],'#9a7952','#d7bf84');
+ worldPolygon([point(.12,.2),point(width-.12,.2),point(width-.12,2.08),point(.12,2.08)],'#b08c5c','#d1b77b');
+ worldLine(point(.12,.2),point(.12,2.08),'#e2c991',1.2);
+ worldLine(point(width-.12,.2),point(width-.12,2.08),'#765735',1.2);
+}
+function drawDoorSign(boundary,roomNumber,faceSide){
+ const z=boundary+faceSide*.035;
+ worldPolygon([[-.53,z,2.3],[.53,z,2.3],[.53,z,2.62],[-.53,z,2.62]],'#d4b66c','#6c4e2e');
+ const label=project(0,z,2.46);
+ if(label){ctx.save();ctx.fillStyle='#49351f';ctx.font='700 '+clamp(label.scale*.105,7,14)+'px Arial';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText('A-'+String(roomNumber).padStart(3,'0'),label.x,label.y);ctx.restore()}
+}
+function drawDoorway(boundary,roomNumber,faceSide){
+ const p=ROOM_MATERIAL,half=halfWidthAt(boundary);
+ worldPolygon([[-half,boundary,0],[-.66,boundary,0],[-.66,boundary,3.6],[-half,boundary,3.6]],p.wall[0],p.edge);
+ worldPolygon([[.66,boundary,0],[half,boundary,0],[half,boundary,3.6],[.66,boundary,3.6]],p.wall[1],p.edge);
+ worldPolygon([[-.66,boundary,2.28],[.66,boundary,2.28],[.66,boundary,3.6],[-.66,boundary,3.6]],p.wall[2],p.edge);
+ worldLine([-.66,boundary,0],[-.66,boundary,2.3],p.doorEdge,3);
+ worldLine([.66,boundary,0],[.66,boundary,2.3],p.doorEdge,3);
+ worldLine([-.66,boundary,2.28],[.66,boundary,2.28],p.doorEdge,3);
+ drawDoorLeaf(boundary,doorStates.get(boundary));
+ drawDoorSign(boundary,roomNumber,faceSide);
+}
 function drawPreviousDoor(){
  if(room<=0)return;
- const z=room*ROOM_LENGTH,half=halfWidthAt(z-.1),p=ROOM_MATERIAL;
- worldPolygon([[-half,z,0],[-.66,z,0],[-.66,z,3.6],[-half,z,3.6]],p.wall[0],p.edge);
- worldPolygon([[.66,z,0],[half,z,0],[half,z,3.6],[.66,z,3.6]],p.wall[1],p.edge);
- worldPolygon([[-.66,z,2.28],[.66,z,2.28],[.66,z,3.6],[-.66,z,3.6]],p.wall[2],p.edge);
- worldPolygon([[-.66,z-.015,0],[.66,z-.015,0],[.66,z-.015,2.28],[-.66,z-.015,2.28]],'#51402e',p.doorEdge);
- ctx.save();ctx.globalAlpha=.45;
- worldPolygon([[-.56,z-.03,.04],[.56,z-.03,.04],[.56,z-.03,2.16],[-.56,z-.03,2.16]],p.doorFace,p.doorEdge);
- worldPolygon([[-.43,z-.05,.22],[.43,z-.05,.22],[.43,z-.05,1.96],[-.43,z-.05,1.96]],p.panel,'#d1b77b');
- ctx.restore();
- worldPolygon([[-.53,z-.075,2.28],[.53,z-.075,2.28],[.53,z-.075,2.62],[-.53,z-.075,2.62]],'#d4b66c','#6c4e2e');
- const label=project(0,z-.1,2.44);
- if(label){ctx.save();ctx.fillStyle='#49351f';ctx.font='700 '+clamp(label.scale*.105,7,14)+'px Arial';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText('A-'+String(room).padStart(3,'0'),label.x,label.y);ctx.restore()}
+ const boundary=room*ROOM_LENGTH;
+ drawDoorway(boundary,room,1);
 }
 function drawEndDoor(){
- const z=(room+1)*ROOM_LENGTH,p=ROOM_MATERIAL,half=halfWidthAt(z-.1);
- worldPolygon([[-half,z,0],[half,z,0],[half,z,3.6],[-half,z,3.6]],p.wall[0],p.edge);
- worldPolygon([[-.66,z-.015,0],[.66,z-.015,0],[.66,z-.015,2.28],[-.66,z-.015,2.28]],'#51402e',p.doorEdge);
- worldPolygon([[-.56,z-.03,.04],[.56,z-.03,.04],[.56,z-.03,2.16],[-.56,z-.03,2.16]],p.doorFace,p.doorEdge);
- worldPolygon([[-.43,z-.05,.22],[.43,z-.05,.22],[.43,z-.05,1.96],[-.43,z-.05,1.96]],p.panel,'#d1b77b');
- const handle=project(.39,z-.08,1.05);if(handle){ctx.fillStyle='#e4d093';ctx.beginPath();ctx.arc(handle.x,handle.y,Math.max(1.2,handle.scale*.021),0,Math.PI*2);ctx.fill()}
- worldPolygon([[-.53,z-.075,2.28],[.53,z-.075,2.28],[.53,z-.075,2.62],[-.53,z-.075,2.62]],'#d4b66c','#6c4e2e');
- const label=project(0,z-.1,2.44);
- if(label){ctx.save();ctx.fillStyle='#49351f';ctx.font='700 '+clamp(label.scale*.115,7,15)+'px Arial';ctx.textAlign='center';ctx.textBaseline='middle';ctx.shadowColor='#f5df9c';ctx.shadowBlur=.6;ctx.fillText('A-'+String(room+1).padStart(3,'0'),label.x,label.y);ctx.restore()}
+ const boundary=(room+1)*ROOM_LENGTH;
+ drawDoorway(boundary,room+1,-1);
 }
 let a1LabelCanvas=null;
 const a1GlowCanvas=document.createElement('canvas');
@@ -589,7 +633,7 @@ function draw(){
  ctx.fillStyle=ceiling;ctx.fillRect(0,0,W,HORIZON+2);
  const floorShade=ctx.createLinearGradient(0,HORIZON,0,H);floorShade.addColorStop(0,'#435c4a');floorShade.addColorStop(1,'#1f3027');
  ctx.fillStyle=floorShade;ctx.fillRect(0,HORIZON,W,H-HORIZON);
- drawCeiling();drawFloor();drawSideWalls();drawEndDoor();drawPreviousDoor();drawEntity();drawClosets();drawDesks();drawHidingView();
+ drawCeiling();drawFloor();drawSideWalls();drawClosets();drawDesks();drawEntity();drawPreviousDoor();drawEndDoor();drawHidingView();
  ctx.restore();
  ctx.save();
  const darkness=ctx.createRadialGradient(W/2,H*.58,35,W/2,H*.58,flashlight?410:225);
