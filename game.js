@@ -215,12 +215,17 @@ function drawSideWalls(){
 }
 function drawLobbyDesk(){
  if(room!==0)return;
- const x=-5.35,z=18.5,w=1.55,d=.95,h=.92;
- const front=[project(x-w,z-d,0),project(x+w,z-d,0),project(x+w,z-d,h),project(x-w,z-d,h)];
- const side=[project(x+w,z-d,0),project(x+w,z+d,0),project(x+w,z+d,h),project(x+w,z-d,h)];
- const top=[project(x-w,z-d,h),project(x+w,z-d,h),project(x+w,z+d,h),project(x-w,z+d,h)];
- polygon(side,'#73563b','#c1a077');polygon(front,'#9a7850','#d7bd8d');polygon(top,'#526c57','#c6b38a');
- const plaque=project(x,z-d-.025,1.06);if(plaque){ctx.save();ctx.fillStyle='#dec77e';ctx.font='700 '+clamp(plaque.scale*.07,7,13)+'px Arial';ctx.textAlign='center';ctx.fillText('RECEPTION',plaque.x,plaque.y);ctx.restore()}
+ const x=-5.35,z=18.5,w=1.45,d=.85,top=.88;
+ const slabFront=[project(x-w,z-d,top),project(x+w,z-d,top),project(x+w,z-d,top+.13),project(x-w,z-d,top+.13)];
+ const slabSide=[project(x+w,z-d,top),project(x+w,z+d,top),project(x+w,z+d,top+.13),project(x+w,z-d,top+.13)];
+ const slabTop=[project(x-w,z-d,top+.13),project(x+w,z-d,top+.13),project(x+w,z+d,top+.13),project(x-w,z+d,top+.13)];
+ polygon(slabSide,'#73563b','#c1a077');polygon(slabFront,'#9a7850','#d7bd8d');polygon(slabTop,'#526c57','#c6b38a');
+ for(const lx of [-1,1])for(const lz of [-1,1]){
+  const px=x+lx*(w-.18),pz=z+lz*(d-.16),half=.09;
+  const front=[project(px-half,pz-half,0),project(px+half,pz-half,0),project(px+half,pz-half,top),project(px-half,pz-half,top)];
+  const side=[project(px+half,pz-half,0),project(px+half,pz+half,0),project(px+half,pz+half,top),project(px+half,pz-half,top)];
+  polygon(side,'#59432f','#a8865d');polygon(front,'#806044','#b18c61');
+ }
 }function closetForRoom(roomNumber){
  const z=roomNumber*ROOM_LENGTH+11.5,side=roomNumber%2===0?-1:1,half=halfWidthAt(z);
  return {room:roomNumber,z,x:side*(half-.14),side};
@@ -257,7 +262,7 @@ function drawClosets(){
 }
 function enterHidingSpot(spot){
  isHiding=true;hidingCloset=spot;hidingType=spot.type==='desk'?'desk':'closet';
- if(hidingType==='desk'){player.x=spot.x;player.z=spot.z+1.25}else{player.x=spot.side*(halfWidthAt(spot.z)-.78);player.z=spot.z}
+ if(hidingType==='desk'){player.x=spot.x;player.z=spot.z-1.25}else{player.x=spot.side*(halfWidthAt(spot.z)-.78);player.z=spot.z}
  keys=Object.create(null);setStatus(hidingType==='desk'?'UNDER DESK — PRESS E TO EXIT':'HIDDEN — PRESS E TO EXIT');sound(95,.22,'triangle',.018);
 }
 function exitCloset(){isHiding=false;hidingCloset=null;hidingType=null;setStatus('LISTEN');sound(155,.16,'triangle',.018)}
