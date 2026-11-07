@@ -119,7 +119,7 @@ function nextRoom(){
  if(doorZ-player.z>2.35){setStatus('DOOR IS TOO FAR');return}
  room++;player.z=doorZ+1.1;player.x=0;doorHint=false;
  sound(330,.08);setTimeout(()=>sound(220,.14),80);updateHud();setStatus('ROOM ENTERED');
- if(!entity&&entityCooldown<=0&&Math.random()<.32){
+ if(!entity&&Math.random()<.32){
   startA25Encounter(room);
   return;
  }
