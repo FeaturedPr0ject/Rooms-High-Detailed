@@ -240,9 +240,9 @@ function update(dt){
    entity.age+=dt;
    entity.particleTimer-=dt;
    if(entity.particleTimer<=0){
-    entity.particles.push({x:entity.x+rand(-.55,.55),z:entity.z-entity.direction*rand(.35,1.05),height:rand(.45,2.65),age:0,life:rand(.65,1.25),scale:rand(.45,.95),variant:Math.floor(Math.random()*2)});
-    if(entity.particles.length>44)entity.particles.shift();
-    entity.particleTimer=.055;
+    entity.particles.push({x:entity.x+rand(-1.15,1.15),z:entity.z-entity.direction*rand(.2,1.7),height:rand(.2,3.35),age:0,life:rand(1.2,2.1),scale:rand(.9,1.7),variant:Math.floor(Math.random()*2)});
+    if(entity.particles.length>96)entity.particles.shift();
+    entity.particleTimer=.035;
    }
    for(const particle of entity.particles){particle.age+=dt;particle.z-=entity.direction*dt*.75}
    entity.particles=entity.particles.filter(particle=>particle.age<particle.life);
@@ -264,9 +264,12 @@ function update(dt){
     dead=true;running=false;health=0;updateHud();setStatus('LOST');
     showOverlay('A-25 FOUND YOU','Stay inside a steel cabinet for both passes.','TRY AGAIN','GAME OVER');return;
    }
-   if(entity&&!isHiding){
+   if(entity){
     const distance=Math.hypot(entity.x-player.x,entity.z-player.z);
-    if(distance<=A25_DAMAGE_RADIUS){shake=Math.max(shake,(1-distance/A25_DAMAGE_RADIUS)*17);setStatus('A-25 NEAR — HIDE NOW')}
+    if(distance<=A25_DAMAGE_RADIUS){
+     shake=Math.max(shake,(1-distance/A25_DAMAGE_RADIUS)*22+1.5);
+     if(!isHiding)setStatus('A-25 NEAR — HIDE NOW');
+    }
    }
   }else{
    entity.age+=dt;
@@ -599,20 +602,39 @@ function drawA1SpriteAt(worldX,worldZ,height,alpha,baseHeight=0,glow=true){
 function drawA25Particle(particle){
  const sprite=a25ParticleSprites[particle.variant];
  const point=project(particle.x,particle.z,particle.height);
- if(!point||point.forward>58||point.x<-100||point.x>W+100)return;
+ if(!point||point.forward>58||point.x<-220||point.x>W+220)return;
  const fade=clamp(1-particle.age/particle.life,0,1);
- const size=clamp(point.scale*particle.scale*.9,2,72);
+ const size=clamp(point.scale*particle.scale*2.25,8,220);
  const aspect=sprite&&sprite.complete&&sprite.naturalWidth?sprite.naturalWidth/sprite.naturalHeight:1;
- const width=size*aspect;
- if(!Number.isFinite(width)||width>120)return;
- const glowRadius=clamp(size*1.15,5,46);
- ctx.save();ctx.globalCompositeOperation='screen';ctx.globalAlpha=fade*.58;
+ const width=clamp(size*aspect,8,260);
+ if(!Number.isFinite(width))return;
+ const glowRadius=clamp(size*.82,12,145);
+ ctx.save();
+ ctx.globalCompositeOperation='lighter';
+ ctx.globalAlpha=fade*.88;
  const glow=ctx.createRadialGradient(point.x,point.y,1,point.x,point.y,glowRadius);
- glow.addColorStop(0,'rgba(80,255,115,.52)');glow.addColorStop(1,'rgba(40,220,80,0)');
- ctx.fillStyle=glow;ctx.beginPath();ctx.arc(point.x,point.y,glowRadius,0,Math.PI*2);ctx.fill();ctx.restore();
- ctx.save();ctx.globalAlpha=fade*.78;
+ glow.addColorStop(0,'rgba(90,255,105,.95)');
+ glow.addColorStop(.34,'rgba(35,255,65,.72)');
+ glow.addColorStop(.72,'rgba(0,225,45,.28)');
+ glow.addColorStop(1,'rgba(0,200,35,0)');
+ ctx.fillStyle=glow;ctx.beginPath();ctx.arc(point.x,point.y,glowRadius,0,Math.PI*2);ctx.fill();
+ ctx.globalAlpha=fade*.94;
+ ctx.strokeStyle='rgba(50,255,85,.9)';
+ ctx.lineWidth=clamp(size*.035,1.5,7);
+ ctx.beginPath();ctx.arc(point.x,point.y,size*.34,0,Math.PI*2);ctx.stroke();
+ ctx.restore();
+ ctx.save();
+ ctx.globalCompositeOperation='lighter';
+ ctx.globalAlpha=fade*.98;
  if(sprite&&sprite.complete&&sprite.naturalWidth)ctx.drawImage(sprite,point.x-width/2,point.y-size/2,width,size);
- else{ctx.fillStyle='rgba(75,255,110,.9)';ctx.beginPath();ctx.arc(point.x,point.y,size*.34,0,Math.PI*2);ctx.fill()}
+ else{
+  const radius=size*.42;
+  const core=ctx.createRadialGradient(point.x,point.y,1,point.x,point.y,radius);
+  core.addColorStop(0,'rgba(145,255,125,1)');
+  core.addColorStop(.55,'rgba(35,255,60,.92)');
+  core.addColorStop(1,'rgba(0,205,30,0)');
+  ctx.fillStyle=core;ctx.beginPath();ctx.arc(point.x,point.y,radius,0,Math.PI*2);ctx.fill();
+ }
  ctx.restore();
 }
 function drawA25(){
