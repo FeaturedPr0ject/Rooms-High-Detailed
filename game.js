@@ -267,6 +267,12 @@ function drawLobbyDesk(){
   worldPolygon([[px+half,pz-half,0],[px+half,pz+half,0],[px+half,pz+half,top],[px+half,pz-half,top]],'#59432f','#a8865d');
  }
 }
+function closetForRoom(roomNumber){
+ const z=roomNumber*ROOM_LENGTH+11.5;
+ const side=roomNumber%2===0?-1:1;
+ const half=halfWidthAt(z);
+ return {room:roomNumber,z,x:side*(half-.14),side};
+}
 function findNearbyCloset(){
  let closest=null,best=Infinity;
  for(let n=Math.max(0,room-1);n<=room+1;n++){
