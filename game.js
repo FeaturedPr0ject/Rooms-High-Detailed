@@ -422,18 +422,12 @@ function drawCeiling(){
   worldPolygon([[-half,z,3.55],[half,z,3.55],[half,z+3,3.55],[-half,z+3,3.55]],ROOM_MATERIAL.ceiling[Math.floor(z/3)%ROOM_MATERIAL.ceiling.length]);
  }
 }
-function drawSideWalls(){
- const start=Math.floor(retainedRoomFloor()*ROOM_LENGTH/2)*2,far=Math.floor((player.z+42)/2)*2;
- for(let z=far;z>=start;z-=2){
-  const half=halfWidthAt(z);
-  for(const side of [-1,1]){
-   const x=side*half,index=(Math.floor(z/2)+(side===1?1:0))%ROOM_MATERIAL.wall.length;
-   worldPolygon([[x,z,0],[x,z+2,0],[x,z+2,3.55],[x,z,3.55]],ROOM_MATERIAL.wall[index],ROOM_MATERIAL.edge);
-   for(const level of [.85,1.75,2.65])worldLine([x-side*.012,z,level],[x-side*.012,z+2,level],'#747e783f',1);
-   worldLine([x-side*.02,z,.14],[x-side*.02,z+2,.14],'#77817a',2);
-   worldLine([x-side*.02,z,3.34],[x-side*.02,z+2,3.34],'#f0eee4',2);
-  }
- }
+function drawSideWallSegment(z,side){
+ const half=halfWidthAt(z+1),x=side*half,index=(Math.floor(z/2)+(side===1?1:0))%ROOM_MATERIAL.wall.length;
+ worldPolygon([[x,z,0],[x,z+2,0],[x,z+2,3.55],[x,z,3.55]],ROOM_MATERIAL.wall[index],ROOM_MATERIAL.edge);
+ for(const level of [.85,1.75,2.65])worldLine([x-side*.012,z,level],[x-side*.012,z+2,level],'#747e783f',1);
+ worldLine([x-side*.02,z,.14],[x-side*.02,z+2,.14],'#77817a',2);
+ worldLine([x-side*.02,z,3.34],[x-side*.02,z+2,3.34],'#f0eee4',2);
 }
 function drawDesk(desk){
  const x=desk.x,z=desk.z,w=1.15,d=.68,top=.86;
@@ -576,18 +570,30 @@ function drawEndDoor(){
 }
 function drawSceneObjects(){
  const items=[];
- for(let n=retainedRoomFloor();n<=room+1;n++){
-  const closet=closetForRoom(n);
-  items.push({z:closet.z,draw:()=>drawCloset(closet)});
-  for(let slot=0;slot<2;slot++){
-   const desk=deskForRoom(n,slot);
-   items.push({z:desk.z,draw:()=>drawDesk(desk)});
+ const wallStart=Math.floor(retainedRoomFloor()*ROOM_LENGTH/2)*2;
+ const wallEnd=Math.floor((player.z+42)/2)*2;
+ for(let z=wallStart;z<=wallEnd;z+=2){
+  for(const side of [-1,1]){
+   const x=side*halfWidthAt(z+1);
+   items.push({depth:cameraSpace(x,z+1,1.75).forward,draw:()=>drawSideWallSegment(z,side)});
   }
  }
- if(entity)items.push({z:entity.z,draw:drawEntity});
- if(room>0)items.push({z:room*ROOM_LENGTH,draw:drawPreviousDoor});
- items.push({z:(room+1)*ROOM_LENGTH,draw:drawEndDoor});
- items.sort((a,b)=>b.z-a.z);
+ for(let n=retainedRoomFloor();n<=room+1;n++){
+  const closet=closetForRoom(n);
+  items.push({depth:cameraSpace(closet.x,closet.z,1.15).forward,draw:()=>drawCloset(closet)});
+  for(let slot=0;slot<2;slot++){
+   const desk=deskForRoom(n,slot);
+   items.push({depth:cameraSpace(desk.x,desk.z,.8).forward,draw:()=>drawDesk(desk)});
+  }
+ }
+ if(entity)items.push({depth:cameraSpace(entity.x,entity.z,1.6).forward,draw:drawEntity});
+ if(room>0){
+  const boundary=room*ROOM_LENGTH;
+  items.push({depth:cameraSpace(0,boundary,1.6).forward,draw:drawPreviousDoor});
+ }
+ const nextBoundary=(room+1)*ROOM_LENGTH;
+ items.push({depth:cameraSpace(0,nextBoundary,1.6).forward,draw:drawEndDoor});
+ items.sort((a,b)=>b.depth-a.depth);
  for(const item of items)item.draw();
 }
 
@@ -759,7 +765,7 @@ function draw(){
  ctx.fillStyle=ceiling;ctx.fillRect(0,0,W,HORIZON+2);
  const floorShade=ctx.createLinearGradient(0,HORIZON,0,H);floorShade.addColorStop(0,'#435c4a');floorShade.addColorStop(1,'#1f3027');
  ctx.fillStyle=floorShade;ctx.fillRect(0,HORIZON,W,H-HORIZON);
- drawCeiling();drawFloor();drawSideWalls();drawSceneObjects();drawHidingView();
+ drawCeiling();drawFloor();drawSceneObjects();drawHidingView();
  ctx.restore();
  ctx.save();
  const darkness=ctx.createRadialGradient(W/2,H*.58,35,W/2,H*.58,flashlight?410:225);
