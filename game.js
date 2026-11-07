@@ -90,7 +90,7 @@ function teleportToRoom(targetRoom){
  if(!Number.isInteger(targetRoom)||targetRoom<0||targetRoom>999){setStatus('INVALID ROOM NUMBER');return}
  room=targetRoom;player.x=0;player.z=room*ROOM_LENGTH+1.1;player.yaw=0;
  keys=Object.create(null);doorHint=false;isHiding=false;hidingCloset=null;hidingType=null;entityCooldown=0;
- if(room===A25_ROOM&&!a25Started&&!a25Completed)startA25Encounter(room);
+ if(room>=A25_ROOM&&!a25Started&&!a25Completed)startA25Encounter(room);
  updateHud();setStatus('TELEPORTED TO '+(room===0?'LOBBY':'ROOM A-'+String(room).padStart(3,'0')));
  adminPanel.style.display='none';adminPanel.setAttribute('aria-hidden','true');
 }
@@ -99,7 +99,7 @@ function nextRoom(){
  if(doorZ-player.z>2.35){setStatus('DOOR IS TOO FAR');return}
  room++;player.z=doorZ+1.1;player.x=0;doorHint=false;
  sound(330,.08);setTimeout(()=>sound(220,.14),80);updateHud();setStatus('ROOM ENTERED');
- if(room===A25_ROOM&&!a25Started&&!a25Completed){startA25Encounter(room);return}
+ if(room>=A25_ROOM&&!a25Started&&!a25Completed){startA25Encounter(room);return}
  const spawnRate=getEntitySpawnRate('A-1');
  if(!entity&&entityCooldown<=0&&Math.random()<spawnRate){
   entity={type:'A-1',x:rand(-.22,.22),z:(room+1)*ROOM_LENGTH-1.4,age:0,phase:'stare',stareTime:rand(1.3,2.2),speed:ROOM_LENGTH*.58,damaged:false,damageTimer:0,cloneTimer:.08,clones:[]};
@@ -472,7 +472,12 @@ function drawA25Particle(particle){
  const size=clamp(point.scale*particle.scale*.9,2,72);
  const width=size*(sprite.naturalWidth/sprite.naturalHeight);
  if(!Number.isFinite(width)||width>120)return;
- ctx.save();ctx.globalAlpha=fade*.68;ctx.drawImage(sprite,point.x-width/2,point.y-size/2,width,size);ctx.restore();
+ const glowRadius=clamp(size*1.15,5,46);
+ ctx.save();ctx.globalCompositeOperation='screen';ctx.globalAlpha=fade*.58;
+ const glow=ctx.createRadialGradient(point.x,point.y,1,point.x,point.y,glowRadius);
+ glow.addColorStop(0,'rgba(80,255,115,.52)');glow.addColorStop(1,'rgba(40,220,80,0)');
+ ctx.fillStyle=glow;ctx.beginPath();ctx.arc(point.x,point.y,glowRadius,0,Math.PI*2);ctx.fill();ctx.restore();
+ ctx.save();ctx.globalAlpha=fade*.78;ctx.drawImage(sprite,point.x-width/2,point.y-size/2,width,size);ctx.restore();
 }
 function drawA25(){
  if(!entity||entity.type!=='A-25')return;
