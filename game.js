@@ -162,18 +162,15 @@ function update(dt){
    entity.particles=entity.particles.filter(particle=>particle.age<particle.life);
    entity.z+=entity.direction*entity.speed*dt;
    if(entity.direction>0&&entity.z>=entity.targetZ){
-    entity.z=entity.targetZ;entity.rebounds++;
-    if(entity.rebounds===1){
-     entity.direction=-1;entity.targetZ=entity.targetRoom*ROOM_LENGTH+.8;
+    entity.z=entity.targetZ;
+    if(entity.rebounds===0){
+     entity.rebounds=1;entity.direction=-1;entity.targetZ=entity.targetRoom*ROOM_LENGTH+.8;
      setStatus('A-25 REBOUNDS — KEEP HIDING');
     }else if(entity.rebounds===2){
-     entity.direction=1;entity.targetZ=(entity.targetRoom+1)*ROOM_LENGTH+2;
-     setStatus('A-25 REBOUNDS AGAIN — FINAL PASS');
-    }else{
      entity=null;a25Completed=true;setStatus('A-25 LEFT THE NEXT ROOM — SURVIVED');
     }
    }else if(entity.direction<0&&entity.z<=entity.targetZ){
-    entity.z=entity.targetZ;entity.rebounds++;
+    entity.z=entity.targetZ;entity.rebounds=2;
     entity.direction=1;entity.targetZ=(entity.targetRoom+1)*ROOM_LENGTH+2;
     setStatus('A-25 REBOUNDS AGAIN — FINAL PASS');
    }
