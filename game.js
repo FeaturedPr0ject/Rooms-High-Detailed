@@ -715,7 +715,7 @@ function drawA25(){
  ctx.fillStyle=glow;ctx.beginPath();ctx.arc(base.x,centerY,radius,0,Math.PI*2);ctx.fill();ctx.restore();
  ctx.save();ctx.globalAlpha=.98;ctx.imageSmoothingEnabled=true;
  if(sprite.complete&&sprite.naturalWidth){
-  if(isC25)ctx.filter='hue-rotate(185deg) saturate(2.5) brightness(1.18)';
+  if(isC25)ctx.filter='hue-rotate(60deg) saturate(2.5) brightness(1.18)';
   ctx.drawImage(sprite,base.x-w/2,top.y,w,h);
  }else{
   ctx.fillStyle=isC25?'rgba(255,65,220,.82)':'rgba(45,245,85,.68)';
