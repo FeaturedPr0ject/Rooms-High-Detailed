@@ -7,11 +7,14 @@ const A25_ROOM=25,A25_SPEED=24,A25_DAMAGE_RADIUS=10,ROOMS_KEPT_BEHIND=2;
 const roomLabel=document.getElementById('room-label'),roomCtx=roomLabel.getContext('2d');
 const statusEl=document.getElementById('status'),healthWrap=document.getElementById('health-wrap'),healthFill=document.getElementById('health-fill');
 const overlay=document.getElementById('overlay'),overlayTitle=document.getElementById('overlay-title'),overlayCopy=document.getElementById('overlay-copy'),overlayEyebrow=document.getElementById('overlay-eyebrow'),resumeBtn=document.getElementById('resume'),muteBtn=document.getElementById('mute'),pauseBtn=document.getElementById('pause');
-const adminToggle=document.getElementById('admin-toggle'),adminPanel=document.getElementById('admin-panel'),adminForm=document.getElementById('admin-form'),adminRoomInput=document.getElementById('admin-room'),adminClose=document.getElementById('admin-close'),adminEntitySelect=document.getElementById('admin-entity'),adminSpawnButton=document.getElementById('admin-spawn'),adminFeedback=document.getElementById('admin-feedback');
+const adminToggle=document.getElementById('admin-toggle'),adminPanel=document.getElementById('admin-panel'),adminForm=document.getElementById('admin-form'),adminRoomInput=document.getElementById('admin-room'),adminClose=document.getElementById('admin-close'),adminEntitySelect=document.getElementById('admin-entity'),adminSpawnButton=document.getElementById('admin-spawn'),adminFeedback=document.getElementById('admin-feedback'),adminGodMode=document.getElementById('admin-god-mode');
 let room=0,furthestRoom=0,health=100,flashlight=true,running=true,paused=false,dead=false,mute=false,last=0,audio=null,shake=0;
 let keys=Object.create(null),entity=null,entityCooldown=0,doorHint=false,mouseTurn=0,isHiding=false,hidingCloset=null,hidingType=null;
-let a25Started=false,a25Completed=false;
+let a25Started=false,a25Completed=false,godMode=false,hideExitGrace=0;
 const player={x:0,z:5,yaw:0,speed:3.25};
+const PLAYER_RADIUS=.42,DOOR_CLEARANCE=.40;
+const movementKeyNames=['w','a','s','d','shift'];
+function clearMovementKeys(){for(const key of movementKeyNames)keys[key]=false}
 const doorStates=new Map();
 function retainedRoomFloor(){return Math.max(0,furthestRoom-ROOMS_KEPT_BEHIND)}
 function pruneDoorStates(){const minimum=retainedRoomFloor()*ROOM_LENGTH;for(const boundary of doorStates.keys())if(boundary<minimum)doorStates.delete(boundary)}
@@ -69,16 +72,19 @@ function showOverlay(title,copy,button,eyebrow){
 }
 function hideOverlay(){overlay.style.display='none'}
 function startNewRun(){
+ clearMovementKeys();hideExitGrace=0;
  room=0;furthestRoom=0;doorStates.clear();health=100;player.x=0;player.z=5;player.yaw=0;viewPitch=0;entity=null;entityCooldown=0;a25Started=false;a25Completed=false;isHiding=false;hidingCloset=null;hidingType=null;dead=false;paused=false;running=true;keys=Object.create(null);
  updateHud();setStatus('LOBBY');hideOverlay();last=performance.now();sound(250,.12);requestAnimationFrame(loop);
 }
 function togglePause(){
  if(dead)return;
+ clearMovementKeys();
  paused=!paused;
  if(paused){setStatus('PAUSED');showOverlay('PAUSED','The hallway is waiting.','RESUME')}
  else{hideOverlay();setStatus('LISTEN');last=performance.now();requestAnimationFrame(loop)}
 }
 function hurt(amount=15){
+ if(godMode)return;
  health=Math.max(0,health-amount);shake=14;sound(70,.32,'sawtooth',.055);updateHud();
  if(health<=0){dead=true;running=false;setStatus('LOST');showOverlay('YOU WERE FOUND','Your run ended in room A-'+String(room).padStart(3,'0')+'.','TRY AGAIN','GAME OVER')}
  else{setStatus('DANGER');player.z=Math.max(room*ROOM_LENGTH+.8,player.z-1.5);entityCooldown=7}
@@ -141,10 +147,10 @@ function nearbyDoor(){
 }
 function handleRoomEntered(nextRoomNumber){
  setStatus('ROOM A-'+String(nextRoomNumber).padStart(3,'0')+' ENTERED');
- if(!entity&&Math.random()<.32){startA25Encounter(nextRoomNumber);return}
+ if(nextRoomNumber>=A25_ROOM&&!entity&&!a25Started&&Math.random()<.32){startA25Encounter(nextRoomNumber);return}
  const spawnRate=getEntitySpawnRate('A-1');
  if(!entity&&entityCooldown<=0&&Math.random()<spawnRate){
-  entity={type:'A-1',x:rand(-.22,.22),z:(nextRoomNumber+1)*ROOM_LENGTH-1.4,age:0,phase:'stare',stareTime:rand(1.3,2.2),speed:ROOM_LENGTH*.58,damaged:false,damageTimer:0,cloneTimer:.08,clones:[]};
+  entity={type:'A-1',x:player.x,z:(nextRoomNumber+1)*ROOM_LENGTH-1.4,age:0,phase:'stare',stareTime:rand(1.3,2.2),speed:ROOM_LENGTH*.58,damaged:false,damageTimer:0,cloneTimer:.08,clones:[]};
   setStatus('A-1 IS WATCHING');sound(118,.42,'sawtooth',.018);
  }
 }
@@ -161,18 +167,21 @@ function onKey(e,down){
   interact();
   return;
  }
- keys[key]=down;
+ if(movementKeyNames.includes(key)){keys[key]=down;return}
  if(!down)return;
  if(key==='escape'){togglePause();return}
  if(key==='f'){flashlight=!flashlight;sound(420,.045);return}
 }
 window.addEventListener('keydown',e=>onKey(e,true));
 window.addEventListener('keyup',e=>onKey(e,false));
+window.addEventListener('blur',clearMovementKeys);
+document.addEventListener('visibilitychange',()=>{if(document.hidden)clearMovementKeys()});
 resumeBtn.addEventListener('click',()=>{if(dead)startNewRun();else if(paused)togglePause()});
 pauseBtn.addEventListener('click',togglePause);
 muteBtn.addEventListener('click',()=>{mute=!mute;muteBtn.textContent=mute?'SOUND OFF':'SOUND ON';if(!mute)sound(300,.05)});
-adminToggle.addEventListener('click',()=>{const open=adminPanel.style.display!=='block';adminPanel.style.display=open?'block':'none';adminPanel.setAttribute('aria-hidden',String(!open));if(open){adminRoomInput.value=String(room);adminRoomInput.focus();adminRoomInput.select()}});
-adminClose.addEventListener('click',()=>{adminPanel.style.display='none';adminPanel.setAttribute('aria-hidden','true')});
+adminToggle.addEventListener('click',()=>{const open=adminPanel.style.display!=='block';if(open)clearMovementKeys();adminPanel.style.display=open?'block':'none';adminPanel.setAttribute('aria-hidden',String(!open));if(open){adminRoomInput.value=String(room);adminRoomInput.focus();adminRoomInput.select()}});
+adminClose.addEventListener('click',()=>{adminPanel.style.display='none';adminPanel.setAttribute('aria-hidden','true');clearMovementKeys();canvas.focus()});
+adminGodMode.addEventListener('change',()=>{godMode=adminGodMode.checked;if(godMode){health=100;setStatus('GOD MODE ENABLED')}else setStatus('GOD MODE DISABLED');adminFeedback.textContent=godMode?'GOD MODE ACTIVE — IMMORTAL':'GOD MODE OFF';updateHud()});
 adminForm.addEventListener('submit',event=>{
  event.preventDefault();
  if(!adminRoomInput.value.trim()||!adminRoomInput.reportValidity())return;
@@ -188,25 +197,29 @@ canvas.addEventListener('pointermove',e=>{if(!rightDragging)return;const dx=e.cl
 const stopRightDrag=()=>{rightDragging=false};
 canvas.addEventListener('pointerup',stopRightDrag);canvas.addEventListener('pointercancel',stopRightDrag);
 function update(dt){
+ if(hideExitGrace>0)hideExitGrace=Math.max(0,hideExitGrace-dt);
  for(const state of doorStates.values())state.angle=Math.min(1.35,state.angle+dt*3.4);
  if(!isHiding){
   const forward=(keys.w?1:0)-(keys.s?1:0),strafe=(keys.d?1:0)-(keys.a?1:0);
   const speed=player.speed*(keys.shift?1.45:1),length=Math.hypot(forward,strafe)||1;
   const f=forward/length*speed*dt,s=strafe/length*speed*dt;
-  const nextX=player.x+Math.cos(player.yaw)*s+Math.sin(player.yaw)*f;
+  let nextX=player.x+Math.cos(player.yaw)*s+Math.sin(player.yaw)*f;
   let nextZ=player.z+Math.cos(player.yaw)*f-Math.sin(player.yaw)*s;
+  const currentHalf=halfWidthAt(player.z)-PLAYER_RADIUS;
+  if(nextX< -currentHalf||nextX>currentHalf)nextX=player.x;
   const oldRoom=Math.max(0,Math.floor(player.z/ROOM_LENGTH));
   const targetRoom=Math.max(0,Math.floor(Math.max(0,nextZ)/ROOM_LENGTH));
   if(targetRoom>oldRoom){
-   const boundary=(oldRoom+1)*ROOM_LENGTH;
-   if(!doorIsOpen(boundary)||Math.abs(nextX)>.70)nextZ=Math.min(nextZ,boundary-.8);
+   const boundary=(oldRoom+1)*ROOM_LENGTH,targetHalf=halfWidthAt(boundary+.1)-PLAYER_RADIUS;
+   if(!doorIsOpen(boundary)||Math.abs(nextX)>DOOR_CLEARANCE||Math.abs(nextX)>targetHalf)nextZ=Math.min(nextZ,boundary-.8);
   }else if(targetRoom<oldRoom){
-   const boundary=oldRoom*ROOM_LENGTH;
-   if(!doorIsOpen(boundary)||Math.abs(nextX)>.70)nextZ=Math.max(nextZ,boundary+.8);
+   const boundary=oldRoom*ROOM_LENGTH,targetHalf=halfWidthAt(boundary-.1)-PLAYER_RADIUS;
+   if(!doorIsOpen(boundary)||Math.abs(nextX)>DOOR_CLEARANCE||Math.abs(nextX)>targetHalf)nextZ=Math.max(nextZ,boundary+.8);
   }
   nextZ=Math.max(nextZ,retainedRoomFloor()*ROOM_LENGTH+.45);
-  const half=halfWidthAt(nextZ);
-  player.x=clamp(nextX,-half+.65,half-.65);
+  const destinationHalf=halfWidthAt(nextZ)-PLAYER_RADIUS;
+  if(nextX< -destinationHalf||nextX>destinationHalf)nextZ=player.z;
+  player.x=nextX;
   player.z=nextZ;
   const nextRoomIndex=Math.max(0,Math.floor(player.z/ROOM_LENGTH));
   if(nextRoomIndex!==room){
@@ -247,7 +260,7 @@ function update(dt){
     entity.direction=1;entity.targetZ=(entity.targetRoom+1)*ROOM_LENGTH-.8;
     setStatus('A-25 REBOUNDS AT THE LOBBY — FINAL PASS');
    }
-   if(entity&&!isHiding&&Math.hypot(entity.x-player.x,entity.z-player.z)<=A25_DAMAGE_RADIUS){
+   if(entity&&!isHiding&&!godMode&&hideExitGrace<=0&&Math.hypot(entity.x-player.x,entity.z-player.z)<=A25_DAMAGE_RADIUS){
     dead=true;running=false;health=0;updateHud();setStatus('LOST');
     showOverlay('A-25 FOUND YOU','Stay inside a steel cabinet for both passes.','TRY AGAIN','GAME OVER');return;
    }
@@ -258,7 +271,7 @@ function update(dt){
   }else{
    entity.age+=dt;
    const auraDistance=Math.hypot(entity.x-player.x,entity.z-player.z);
-   if(!isHiding&&auraDistance<=A1_DAMAGE_RADIUS){
+   if(!godMode&&!isHiding&&auraDistance<=A1_DAMAGE_RADIUS){
     entity.damageTimer-=dt;
     if(entity.damageTimer<=0){
      health=Math.max(0,health-A1_DAMAGE_PER_TICK);shake=8;sound(95,.12,'sawtooth',.025);updateHud();
@@ -347,7 +360,7 @@ function polygon(points,color,stroke){
  ctx.fillStyle=color;ctx.fill();if(stroke){ctx.strokeStyle=stroke;ctx.lineWidth=1;ctx.stroke()}
  ctx.restore();
 }
-function halfWidthAt(z){return z<ROOM_LENGTH?8.2:CORRIDOR_HALF}
+function halfWidthAt(z){return z<ROOM_LENGTH?5.8:CORRIDOR_HALF}
 const ROOM_MATERIAL={
  wall:['#c8cbc5','#b9bfbb','#d2d3cc'],edge:'#e2e2d8',groove:'#858e88',
  floor:['#536d59','#607a64','#49634f','#71846a'],floorSeam:'#263d30',
@@ -392,18 +405,18 @@ function drawSideWalls(){
 }
 function drawDesk(desk){
  const x=desk.x,z=desk.z,w=1.15,d=.68,top=.86;
- worldPolygon([[x-w,z-d,top],[x+w,z-d,top],[x+w,z-d,top+.13],[x-w,z-d,top+.13]],'#9a7850','#d7bd8d');
- worldPolygon([[x+w,z-d,top],[x+w,z+d,top],[x+w,z+d,top+.13],[x+w,z-d,top+.13]],'#73563b','#c1a077');
- worldPolygon([[x-w,z-d,top+.13],[x+w,z-d,top+.13],[x+w,z+d,top+.13],[x-w,z+d,top+.13]],'#526c57','#c6b38a');
  for(const lx of [-1,1])for(const lz of [-1,1]){
   const px=x+lx*(w-.16),pz=z+lz*(d-.12),half=.075;
   worldPolygon([[px-half,pz-half,0],[px+half,pz-half,0],[px+half,pz-half,top],[px-half,pz-half,top]],'#806044','#b18c61');
   worldPolygon([[px+half,pz-half,0],[px+half,pz+half,0],[px+half,pz+half,top],[px+half,pz-half,top]],'#59432f','#a8865d');
  }
+ worldPolygon([[x-w,z-d,top],[x+w,z-d,top],[x+w,z-d,top+.13],[x-w,z-d,top+.13]],'#9a7850','#d7bd8d');
+ worldPolygon([[x+w,z-d,top],[x+w,z+d,top],[x+w,z+d,top+.13],[x+w,z-d,top+.13]],'#73563b','#c1a077');
+ worldPolygon([[x-w,z-d,top+.13],[x+w,z-d,top+.13],[x+w,z+d,top+.13],[x-w,z+d,top+.13]],'#526c57','#c6b38a');
 }
 function drawDesks(){
- for(let n=retainedRoomFloor();n<=room+1;n++){
-  for(let slot=0;slot<2;slot++)drawDesk(deskForRoom(n,slot));
+ for(let n=room+1;n>=retainedRoomFloor();n--){
+  for(let slot=1;slot>=0;slot--)drawDesk(deskForRoom(n,slot));
  }
 }
 function closetForRoom(roomNumber){
@@ -437,7 +450,7 @@ function findNearbyDesk(){
  return best<2.5?closest:null;
 }
 function drawClosets(){
- for(let n=retainedRoomFloor();n<=room+1;n++){
+ for(let n=room+1;n>=retainedRoomFloor();n--){
   const c=closetForRoom(n),frontX=c.x-c.side*.23,backX=c.x+c.side*.05,z=c.z;
   worldPolygon([[backX,z-.54,0],[frontX,z-.54,0],[frontX,z-.54,2.35],[backX,z-.54,2.35]],'#343b40','#87949a');
   worldPolygon([[backX,z-.54,2.35],[frontX,z-.54,2.35],[frontX,z+.54,2.35],[backX,z+.54,2.35]],'#68747b','#aab5b9');
@@ -452,11 +465,12 @@ function drawClosets(){
  }
 }
 function enterHidingSpot(spot){
+ clearMovementKeys();hideExitGrace=0;
  isHiding=true;hidingCloset=spot;hidingType=spot.type==='desk'?'desk':'closet';
  if(hidingType==='desk'){player.x=spot.x-spot.side*.3;player.z=spot.z+.15}else{player.x=spot.side*(halfWidthAt(spot.z)-.78);player.z=spot.z}
  keys=Object.create(null);setStatus(hidingType==='desk'?'UNDER DESK — PRESS E TO EXIT':'HIDDEN — PRESS E TO EXIT');sound(95,.22,'triangle',.018);
 }
-function exitCloset(){isHiding=false;hidingCloset=null;hidingType=null;setStatus('LISTEN');sound(155,.16,'triangle',.018)}
+function exitCloset(){isHiding=false;hidingCloset=null;hidingType=null;hideExitGrace=1.5;setStatus('LISTEN');sound(155,.16,'triangle',.018)}
 function interact(){
  if(isHiding){exitCloset();return}
  const closet=findNearbyCloset();if(closet){enterHidingSpot(closet);return}
