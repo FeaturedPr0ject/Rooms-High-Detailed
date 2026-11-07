@@ -89,9 +89,9 @@ function hurt(amount=15){
  if(health<=0){dead=true;running=false;setStatus('LOST');showOverlay('YOU WERE FOUND','Your run ended in room A-'+String(room).padStart(3,'0')+'.','TRY AGAIN','GAME OVER')}
  else{setStatus('DANGER');player.z=Math.max(room*ROOM_LENGTH+.8,player.z-1.5);entityCooldown=7}
 }
-function startA25Encounter(targetRoom,allowC25=true){
+function startA25Encounter(targetRoom,allowC25=true,forceC25=false){
  a25Started=true;a25Completed=false;entityCooldown=0;
- const isC25=allowC25&&Math.random()<C25_SPAWN_CHANCE;
+ const isC25=forceC25||(allowC25&&Math.random()<C25_SPAWN_CHANCE);
  const type=isC25?'C-25':'A-25',targetEnd=(targetRoom+1)*ROOM_LENGTH-.8;
  entity={type,x:0,z:1.2,age:0,direction:1,targetRoom,targetZ:targetEnd,rebounds:0,particleTimer:0,particles:[],speed:isC25?C25_SPEED:A25_SPEED,reboundLimit:isC25?5:2};
  setStatus(type+' SPAWNED IN THE LOBBY — HIDE NOW');
@@ -108,21 +108,21 @@ function spawnAdminEntity(){
  const selected=adminEntitySelect.value;
  entityCooldown=0;
  if(selected==='A-1'){
-  entity={type:'A-1',x:player.x,z:player.z+14,age:0,phase:'stare',stareTime:1.5,speed:ROOM_LENGTH*.58,damaged:false,damageTimer:0,cloneTimer:.08,clones:[]};
+  entity={type:'A-1',x:0,z:player.z+14,age:0,phase:'run',speed:ROOM_LENGTH*.58,damaged:false,damageTimer:0,cloneTimer:.08,clones:[]};
   setStatus('ADMIN SPAWNED A-1');
   adminFeedback.textContent='A-1 SPAWNED IN FRONT OF PLAYER';
- }else if(selected==='A-25'){
-  const spawnRoom=Math.max(1,room),targetZ=(spawnRoom+1)*ROOM_LENGTH-.8;
-  startA25Encounter(spawnRoom,false);
-  setStatus('ADMIN SPAWNED A-25');
-  adminFeedback.textContent='A-25 SPAWNED — HIDE IN A STEEL CABINET';
+ }else if(selected==='A-25'||selected==='C-25'){
+  const spawnRoom=Math.max(1,room);
+  startA25Encounter(spawnRoom,false,selected==='C-25');
+  setStatus('ADMIN SPAWNED '+selected);
+  adminFeedback.textContent=selected+' SPAWNED FROM THE LOBBY';
  }else{
   adminFeedback.textContent='UNKNOWN ENTITY';
   return;
  }
- if(entity&&entity.type==='A-25')a25Started=true;
+ if(entity&&(entity.type==='A-25'||entity.type==='C-25'))a25Started=true;
  adminPanel.style.display='none';adminPanel.setAttribute('aria-hidden','true');
- sound(selected==='A-25'?62:118,.35,'sawtooth',.028);
+ sound(selected==='A-25'?62:selected==='C-25'?92:118,.35,'sawtooth',.028);
 }
 function openDoor(direction){
  const boundary=direction>0?(room+1)*ROOM_LENGTH:room*ROOM_LENGTH;
@@ -151,7 +151,7 @@ function handleRoomEntered(nextRoomNumber){
  if(nextRoomNumber>=A25_ROOM&&!entity&&!a25Started&&Math.random()<.32){startA25Encounter(nextRoomNumber);return}
  const spawnRate=getEntitySpawnRate('A-1');
  if(!entity&&entityCooldown<=0&&Math.random()<spawnRate){
-  entity={type:'A-1',x:player.x,z:(nextRoomNumber+1)*ROOM_LENGTH-1.4,age:0,phase:'stare',stareTime:rand(1.3,2.2),speed:ROOM_LENGTH*.58,damaged:false,damageTimer:0,cloneTimer:.08,clones:[]};
+  entity={type:'A-1',x:0,z:(nextRoomNumber+1)*ROOM_LENGTH-1.4,age:0,phase:'run',speed:ROOM_LENGTH*.58,damaged:false,damageTimer:0,cloneTimer:.08,clones:[]};
   setStatus('A-1 IS WATCHING');sound(118,.42,'sawtooth',.018);
  }
 }
@@ -308,7 +308,7 @@ function update(dt){
      clone.age+=dt;clone.lift=Math.min(2.1,clone.lift+dt*1.8);
      if(clone.age>=.95)entity.clones.splice(index,1);
     }
-    if(entity.z<player.z-2.4){entity=null;entityCooldown=10;setStatus(isHiding?'HIDDEN':'QUIET')}
+    if(entity.z<=.8){entity=null;entityCooldown=10;setStatus(isHiding?'HIDDEN':'A-1 RETURNED TO LOBBY')}
    }
   }
  }
@@ -743,7 +743,7 @@ function draw(){
  const darkness=ctx.createRadialGradient(W/2,H*.58,35,W/2,H*.58,flashlight?410:225);
  darkness.addColorStop(0,'rgba(0,0,0,0)');darkness.addColorStop(.62,'rgba(0,0,0,.18)');darkness.addColorStop(1,flashlight?'rgba(0,0,0,.68)':'rgba(0,0,0,.94)');
  ctx.fillStyle=darkness;ctx.fillRect(0,0,W,H);ctx.restore();
- if(entity&&entity.phase==='stare')drawPixelCanvasText('A-1',W/2,H-55,'700 13px Arial,Helvetica,sans-serif','#c2b88d','center');
+ if(entity&&entity.type==='A-1'&&entity.phase==='stare')drawPixelCanvasText('A-1',W/2,H-55,'700 13px Arial,Helvetica,sans-serif','#c2b88d','center');
 }
 function loop(t){
  if(!running||paused||dead)return;
