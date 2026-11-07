@@ -12,8 +12,7 @@ let room=0,health=100,flashlight=true,running=true,paused=false,dead=false,mute=
 let keys=Object.create(null),entity=null,entityCooldown=0,doorHint=false,mouseTurn=0,isHiding=false,hidingCloset=null,hidingType=null;
 let a25Started=false,a25Completed=false;
 const player={x:0,z:5,yaw:0,speed:3.25};
-let viewPitch=0,rightDragging=false,lastPointerX=0,lastPointerY=0,glowFrame=0,lastRenderTime=0;
-const TARGET_FRAME_MS=1000/45;
+let viewPitch=0,rightDragging=false,lastPointerX=0,lastPointerY=0;
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 const rand=(a,b)=>a+Math.random()*(b-a);
 function sound(freq=180,duration=.1,wave='sine',volume=.025){
@@ -67,13 +66,13 @@ function showOverlay(title,copy,button,eyebrow){
 function hideOverlay(){overlay.style.display='none'}
 function startNewRun(){
  room=0;health=100;player.x=0;player.z=5;player.yaw=0;viewPitch=0;entity=null;entityCooldown=0;a25Started=false;a25Completed=false;isHiding=false;hidingCloset=null;hidingType=null;dead=false;paused=false;running=true;keys=Object.create(null);
- updateHud();setStatus('LOBBY');hideOverlay();last=performance.now();lastRenderTime=0;sound(250,.12);requestAnimationFrame(loop);
+ updateHud();setStatus('LOBBY');hideOverlay();last=performance.now();sound(250,.12);requestAnimationFrame(loop);
 }
 function togglePause(){
  if(dead)return;
  paused=!paused;
  if(paused){setStatus('PAUSED');showOverlay('PAUSED','The hallway is waiting.','RESUME')}
- else{hideOverlay();setStatus('LISTEN');last=performance.now();lastRenderTime=0;requestAnimationFrame(loop)}
+ else{hideOverlay();setStatus('LISTEN');last=performance.now();requestAnimationFrame(loop)}
 }
 function hurt(amount=15){
  health=Math.max(0,health-amount);shake=14;sound(70,.32,'sawtooth',.055);updateHud();
@@ -473,6 +472,15 @@ function drawEndDoor(){
  if(label){ctx.save();ctx.fillStyle='#49351f';ctx.font='700 '+clamp(label.scale*.115,7,15)+'px Arial';ctx.textAlign='center';ctx.textBaseline='middle';ctx.shadowColor='#f5df9c';ctx.shadowBlur=.6;ctx.fillText('A-'+String(room+1).padStart(3,'0'),label.x,label.y);ctx.restore()}
 }
 let a1LabelCanvas=null;
+const a1GlowCanvas=document.createElement('canvas');
+a1GlowCanvas.width=128;a1GlowCanvas.height=128;
+const a1GlowContext=a1GlowCanvas.getContext('2d');
+const a1GlowGradient=a1GlowContext.createRadialGradient(64,64,1,64,64,64);
+a1GlowGradient.addColorStop(0,'rgba(225,235,255,.34)');
+a1GlowGradient.addColorStop(.32,'rgba(195,213,255,.18)');
+a1GlowGradient.addColorStop(1,'rgba(175,205,255,0)');
+a1GlowContext.fillStyle=a1GlowGradient;
+a1GlowContext.fillRect(0,0,128,128);
 const a1Sprite=new Image();
 a1Sprite.decoding='async';
 a1Sprite.src='./assets/a1.webp';
@@ -491,10 +499,11 @@ function drawA1SpriteAt(worldX,worldZ,height,alpha,baseHeight=0,glow=true){
  const rawHeight=Math.abs(base.y-top.y),h=clamp(rawHeight,0,560),w=clamp(h*(a1Sprite.naturalWidth/a1Sprite.naturalHeight),0,560);
  if(h<2||w<2||!Number.isFinite(h+w))return;
  const centerY=top.y+h*.52;
- if(glow&&(glowFrame++%2===0)){
-  const radius=clamp(w*.85,12,220),light=ctx.createRadialGradient(base.x,centerY,1,base.x,centerY,radius);
-  light.addColorStop(0,'rgba(225,235,255,.30)');light.addColorStop(.32,'rgba(195,213,255,.15)');light.addColorStop(1,'rgba(175,205,255,0)');
-  ctx.save();ctx.globalCompositeOperation='screen';ctx.globalAlpha=alpha;ctx.fillStyle=light;ctx.beginPath();ctx.arc(base.x,centerY,radius,0,Math.PI*2);ctx.fill();ctx.restore();
+ if(glow){
+  const radius=clamp(w*.85,12,220);
+  ctx.save();ctx.globalCompositeOperation='screen';ctx.globalAlpha=alpha;
+  ctx.drawImage(a1GlowCanvas,base.x-radius,centerY-radius,radius*2,radius*2);
+  ctx.restore();
  }
  const pulse=entity&&entity.phase==='stare'?1+Math.sin(entity.age*14)*.012:1;
  ctx.save();ctx.globalAlpha=alpha;ctx.imageSmoothingEnabled=true;ctx.drawImage(a1Sprite,base.x-w*pulse/2,top.y+(h-h*pulse)/2,w*pulse,h*pulse);ctx.restore();
@@ -580,9 +589,7 @@ function draw(){
 }
 function loop(t){
  if(!running||paused||dead)return;
- if(lastRenderTime&&t-lastRenderTime<TARGET_FRAME_MS){requestAnimationFrame(loop);return}
- lastRenderTime=t;
- const dt=Math.min((t-last)/1000,.06);last=t;update(dt);draw();requestAnimationFrame(loop);
+ const dt=Math.min((t-last)/1000,.04);last=t;update(dt);draw();requestAnimationFrame(loop);
 }
 installPixelText();updateHud();setStatus('');last=performance.now();requestAnimationFrame(loop);
 })();
