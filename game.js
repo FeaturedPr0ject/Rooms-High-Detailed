@@ -449,21 +449,23 @@ function findNearbyDesk(){
  }
  return best<2.5?closest:null;
 }
-function drawClosets(){
- for(let n=room+1;n>=retainedRoomFloor();n--){
-  const c=closetForRoom(n),frontX=c.x-c.side*.23,backX=c.x+c.side*.05,z=c.z;
-  worldPolygon([[backX,z-.54,0],[frontX,z-.54,0],[frontX,z-.54,2.35],[backX,z-.54,2.35]],'#343b40','#87949a');
-  worldPolygon([[backX,z-.54,2.35],[frontX,z-.54,2.35],[frontX,z+.54,2.35],[backX,z+.54,2.35]],'#68747b','#aab5b9');
-  worldPolygon([[frontX,z-.54,0],[frontX,z+.54,0],[frontX,z+.54,2.35],[frontX,z-.54,2.35]],'#30383e','#aeb9bd');
-  worldPolygon([[frontX-c.side*.015,z-.45,.08],[frontX-c.side*.015,z+.45,.08],[frontX-c.side*.015,z+.45,2.26],[frontX-c.side*.015,z-.45,2.26]],'#68757c','#c1cbd0');
-  worldPolygon([[frontX-c.side*.025,z-.34,.22],[frontX-c.side*.025,z+.34,.22],[frontX-c.side*.025,z+.34,2.12],[frontX-c.side*.025,z-.34,2.12]],'#77858c','#aeb9bd');
-  for(const ventY of [.42,.5,.58])worldLine([frontX-c.side*.04,z-.18,ventY*3.2],[frontX-c.side*.04,z+.18,ventY*3.2],'#354047',1.5);
-  const handle=project(frontX-c.side*.04,z+.3,1.08);
-  if(handle){ctx.fillStyle='#e3cb8d';ctx.beginPath();ctx.arc(handle.x,handle.y,Math.max(1,handle.scale*.023),0,Math.PI*2);ctx.fill()}
-  const plate=project(frontX-c.side*.045,z,2.43);
-  if(plate){ctx.fillStyle='#c4cdd0';ctx.fillRect(plate.x-5,plate.y-2,10,4)}
- }
+function drawCloset(c){
+ const frontX=c.x-c.side*.23,backX=c.x+c.side*.05,z=c.z;
+ worldPolygon([[backX,z-.54,0],[frontX,z-.54,0],[frontX,z-.54,2.35],[backX,z-.54,2.35]],'#343b40','#87949a');
+ worldPolygon([[backX,z-.54,2.35],[frontX,z-.54,2.35],[frontX,z+.54,2.35],[backX,z+.54,2.35]],'#68747b','#aab5b9');
+ worldPolygon([[frontX,z-.54,0],[frontX,z+.54,0],[frontX,z+.54,2.35],[frontX,z-.54,2.35]],'#30383e','#aeb9bd');
+ worldPolygon([[frontX-c.side*.015,z-.45,.08],[frontX-c.side*.015,z+.45,.08],[frontX-c.side*.015,z+.45,2.26],[frontX-c.side*.015,z-.45,2.26]],'#68757c','#c1cbd0');
+ worldPolygon([[frontX-c.side*.025,z-.34,.22],[frontX-c.side*.025,z+.34,.22],[frontX-c.side*.025,z+.34,2.12],[frontX-c.side*.025,z-.34,2.12]],'#77858c','#aeb9bd');
+ for(const ventY of [.42,.5,.58])worldLine([frontX-c.side*.04,z-.18,ventY*3.2],[frontX-c.side*.04,z+.18,ventY*3.2],'#354047',1.5);
+ const handle=project(frontX-c.side*.04,z+.3,1.08);
+ if(handle){ctx.fillStyle='#e3cb8d';ctx.beginPath();ctx.arc(handle.x,handle.y,Math.max(1,handle.scale*.023),0,Math.PI*2);ctx.fill()}
+ const plate=project(frontX-c.side*.045,z,2.43);
+ if(plate){ctx.fillStyle='#c4cdd0';ctx.fillRect(plate.x-5,plate.y-2,10,4)}
 }
+function drawClosets(){
+ for(let n=room+1;n>=retainedRoomFloor();n--)drawCloset(closetForRoom(n));
+}
+
 function enterHidingSpot(spot){
  clearMovementKeys();hideExitGrace=0;
  isHiding=true;hidingCloset=spot;hidingType=spot.type==='desk'?'desk':'closet';
@@ -540,6 +542,23 @@ function drawEndDoor(){
  const boundary=(room+1)*ROOM_LENGTH;
  drawDoorway(boundary,room+1,-1);
 }
+function drawSceneObjects(){
+ const items=[];
+ for(let n=retainedRoomFloor();n<=room+1;n++){
+  const closet=closetForRoom(n);
+  items.push({z:closet.z,draw:()=>drawCloset(closet)});
+  for(let slot=0;slot<2;slot++){
+   const desk=deskForRoom(n,slot);
+   items.push({z:desk.z,draw:()=>drawDesk(desk)});
+  }
+ }
+ if(entity)items.push({z:entity.z,draw:drawEntity});
+ if(room>0)items.push({z:room*ROOM_LENGTH,draw:drawPreviousDoor});
+ items.push({z:(room+1)*ROOM_LENGTH,draw:drawEndDoor});
+ items.sort((a,b)=>b.z-a.z);
+ for(const item of items)item.draw();
+}
+
 let a1LabelCanvas=null;
 const a1GlowCanvas=document.createElement('canvas');
 a1GlowCanvas.width=128;a1GlowCanvas.height=128;
@@ -653,7 +672,7 @@ function draw(){
  ctx.fillStyle=ceiling;ctx.fillRect(0,0,W,HORIZON+2);
  const floorShade=ctx.createLinearGradient(0,HORIZON,0,H);floorShade.addColorStop(0,'#435c4a');floorShade.addColorStop(1,'#1f3027');
  ctx.fillStyle=floorShade;ctx.fillRect(0,HORIZON,W,H-HORIZON);
- drawCeiling();drawFloor();drawSideWalls();drawClosets();drawDesks();drawEntity();drawPreviousDoor();drawEndDoor();drawHidingView();
+ drawCeiling();drawFloor();drawSideWalls();drawSceneObjects();drawHidingView();
  ctx.restore();
  ctx.save();
  const darkness=ctx.createRadialGradient(W/2,H*.58,35,W/2,H*.58,flashlight?410:225);
