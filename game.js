@@ -520,7 +520,8 @@ function drawA25Particle(particle){
  if(!point||point.forward>58||point.x<-100||point.x>W+100)return;
  const fade=clamp(1-particle.age/particle.life,0,1);
  const size=clamp(point.scale*particle.scale*.9,2,72);
- const width=size*(sprite.naturalWidth/sprite.naturalHeight);
+ const aspect=sprite&&sprite.complete&&sprite.naturalWidth?sprite.naturalWidth/sprite.naturalHeight:1;
+ const width=size*aspect;
  if(!Number.isFinite(width)||width>120)return;
  const glowRadius=clamp(size*1.15,5,46);
  ctx.save();ctx.globalCompositeOperation='screen';ctx.globalAlpha=fade*.58;
