@@ -129,7 +129,7 @@ function update(dt){
   entity.age+=dt;
   entity.damageTimer-=dt;
   const auraDistance=Math.hypot(entity.x-player.x,entity.z-player.z);
-  if(!isHiding&&auraDistance<=100&&entity.damageTimer<=0){health=Math.max(0,health-10);shake=8;sound(95,.12,'sawtooth',.025);updateHud();entity.damageTimer=1;if(health<=0){dead=true;running=false;setStatus('LOST');showOverlay('YOU WERE FOUND','A-1 drained your health in room A-'+String(room).padStart(3,'0')+'.','TRY AGAIN','GAME OVER');return}}
+  if(!isHiding&&auraDistance<=30&&entity.damageTimer<=0){health=Math.max(0,health-10);shake=8;sound(95,.12,'sawtooth',.025);updateHud();entity.damageTimer=1;if(health<=0){dead=true;running=false;setStatus('LOST');showOverlay('YOU WERE FOUND','A-1 drained your health in room A-'+String(room).padStart(3,'0')+'.','TRY AGAIN','GAME OVER');return}}
   if(entity.phase==='stare'){
    if(entity.age>=entity.stareTime){entity.phase='run';entity.age=0;entity.cloneTimer=0;setStatus(isHiding?'HIDDEN — A-1 PASSING':'A-1 IS RUNNING');sound(82,.35,'sawtooth',.028)}
   }else{
@@ -208,8 +208,6 @@ function drawSideWalls(){
    const baseA=project(x-side*.02,z,.14),baseB=project(x-side*.02,z+2,.14),capA=project(x-side*.02,z,3.34),capB=project(x-side*.02,z+2,3.34);
    if(baseA&&baseB){ctx.strokeStyle='#77817a';ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(baseA.x,baseA.y);ctx.lineTo(baseB.x,baseB.y);ctx.stroke()}
    if(capA&&capB){ctx.strokeStyle='#f0eee4';ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(capA.x,capA.y);ctx.lineTo(capB.x,capB.y);ctx.stroke()}
-   if(Math.round(z)%8===0){const p=project(x-side*.035,z+1,1.9);if(p&&p.x>-60&&p.x<W+60){const w=Math.max(2,p.scale*.12),h=Math.max(3,p.scale*.24);ctx.fillStyle='#454c48';ctx.fillRect(p.x-w/2,p.y-h/2,w,h);ctx.fillStyle='#d8c48c';ctx.fillRect(p.x-w*.25,p.y-h*.34,w*.5,h*.68)}}
-   if(Math.round(z)%10===0){const zd=z+1,p=[project(x,zd-.43,0),project(x,zd+.43,0),project(x,zd+.43,2.08),project(x,zd-.43,2.08)];polygon(p,ROOM_MATERIAL.door,ROOM_MATERIAL.doorEdge);const inner=[project(x-side*.025,zd-.35,.08),project(x-side*.025,zd+.35,.08),project(x-side*.025,zd+.35,1.98),project(x-side*.025,zd-.35,1.98)];polygon(inner,ROOM_MATERIAL.doorFace,ROOM_MATERIAL.panel)}
   }
  }
 }
