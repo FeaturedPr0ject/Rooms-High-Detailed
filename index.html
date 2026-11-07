@@ -2,14 +2,14 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <meta name="theme-color" content="#080909">
 <title>ROOMS — Low Detailed</title>
 <style>
 :root{color-scheme:dark;--gold:#c2b88d}
 *{box-sizing:border-box}
 html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#000;color:var(--gold);font:14px/1.45 "Segoe UI",Arial,Helvetica,sans-serif;-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
-body{padding:0}.shell{position:fixed;inset:0;width:100vw;height:100dvh;background:#050706}.gameframe{position:absolute;inset:0;overflow:hidden}#game{display:block;width:100%;height:100%;image-rendering:auto}
+body{padding:0;min-width:100%;min-height:100%;overscroll-behavior:none}.shell{position:fixed;inset:0;width:100vw;width:100dvw;height:100vh;height:100dvh;min-height:100svh;background:#050706;overflow:hidden}.gameframe{position:absolute;inset:0;width:100%;height:100%;overflow:hidden}#game{position:absolute;inset:0;display:block;width:100%;height:100%;min-width:100%;min-height:100%;object-fit:fill;image-rendering:auto}
 .hud{position:absolute;inset:0;pointer-events:none;color:var(--gold);text-shadow:0 1px 4px #000}
 .room-label{position:absolute;top:18px;left:22px;width:180px;height:27px;image-rendering:pixelated;image-rendering:crisp-edges}
 .health-wrap{display:none;position:absolute;right:22px;top:22px;width:190px}
@@ -42,7 +42,7 @@ body{padding:0}.shell{position:fixed;inset:0;width:100vw;height:100dvh;backgroun
 .admin-divider{height:1px;background:#7b704d66;margin:1px 0}
 .admin-feedback{min-height:14px;color:#a8c99c;font:10px/1.35 "Courier New",monospace;letter-spacing:.04em;opacity:.9}
 .admin-panel .pixel-text-canvas{image-rendering:pixelated;image-rendering:crisp-edges;vertical-align:middle;max-width:100%}
-.touch-controls{display:none;position:absolute;z-index:4;left:12px;bottom:18px;right:12px;pointer-events:none;align-items:flex-end;justify-content:space-between;touch-action:none}.touch-pad{display:grid;grid-template-columns:repeat(3,48px);grid-template-rows:repeat(2,48px);gap:5px;pointer-events:auto}.touch-actions{display:flex;align-items:flex-end;gap:9px;pointer-events:auto}.touch-btn{width:48px;height:48px;border:1px solid #c2b88d88;border-radius:12px;background:#111a17cc;color:#e5d8a5;font:700 15px/1 Arial,sans-serif;touch-action:none;user-select:none;-webkit-user-select:none;box-shadow:0 3px 12px #0008}.touch-btn:active,.touch-btn.pressed{background:#536b50cc;border-color:#b8e6a0}.touch-btn.action{width:58px;height:58px;border-radius:50%;font-size:17px}.touch-btn.run{width:48px;height:48px;font-size:11px}.touch-empty{visibility:hidden}@media(max-width:700px),(pointer:coarse){.touch-controls{display:flex}.controls{display:none}.gameframe canvas{touch-action:none}}
+.touch-controls{display:none;position:absolute;z-index:4;left:12px;bottom:18px;right:12px;pointer-events:none;align-items:flex-end;justify-content:space-between;touch-action:none}.touch-pad{display:grid;grid-template-columns:repeat(3,48px);grid-template-rows:repeat(2,48px);gap:5px;pointer-events:auto}.touch-actions{display:flex;align-items:flex-end;gap:9px;pointer-events:auto}.touch-btn{width:48px;height:48px;border:1px solid #c2b88d88;border-radius:12px;background:#111a17cc;color:#e5d8a5;font:700 15px/1 Arial,sans-serif;touch-action:none;user-select:none;-webkit-user-select:none;box-shadow:0 3px 12px #0008}.touch-btn:active,.touch-btn.pressed{background:#536b50cc;border-color:#b8e6a0}.touch-btn.action{width:58px;height:58px;border-radius:50%;font-size:17px}.touch-btn.run{width:48px;height:48px;font-size:11px}.touch-empty{visibility:hidden}@media(max-width:700px),(pointer:coarse){.touch-controls{display:flex;bottom:max(18px,env(safe-area-inset-bottom))}.controls{display:none}.gameframe canvas{touch-action:none}}
 .controls{position:absolute;left:50%;bottom:13px;transform:translateX(-50%);display:flex;gap:15px;white-space:nowrap;font-size:9px;letter-spacing:.05em;color:var(--gold);text-shadow:0 1px 4px #000;opacity:.72}
 .overlay{position:absolute;inset:0;z-index:5;display:none;place-items:center;background:#030505d9;padding:20px;text-align:center}
 .dialog{width:min(440px,100%);padding:28px;background:#0d1210ed;border:1px solid #665d43;box-shadow:0 15px 60px #000}
