@@ -384,7 +384,7 @@ function drawFloor(){
  }
 }
 function drawCeiling(){
- const near=Math.max(0,(room-ROOMS_KEPT_BEHIND)*ROOM_LENGTH),far=player.z+42;
+ const near=retainedRoomFloor()*ROOM_LENGTH,far=player.z+42;
  for(let z=Math.floor(far/3)*3;z>=Math.floor(near/3)*3;z-=3){
   const half=halfWidthAt(z);
   worldPolygon([[-half,z,3.55],[half,z,3.55],[half,z+3,3.55],[-half,z+3,3.55]],ROOM_MATERIAL.ceiling[Math.floor(z/3)%ROOM_MATERIAL.ceiling.length]);
@@ -441,7 +441,7 @@ function deskForRoom(roomNumber,slot){
 }
 function findNearbyDesk(){
  let closest=null,best=Infinity;
- for(let n=Math.max(0,room-ROOMS_KEPT_BEHIND);n<=room+1;n++){
+ for(let n=retainedRoomFloor();n<=room+1;n++){
   for(let slot=0;slot<2;slot++){
    const desk=deskForRoom(n,slot),distance=Math.hypot(player.x-desk.x,player.z-desk.z);
    if(distance<best){best=distance;closest=desk}
