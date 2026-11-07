@@ -3,6 +3,7 @@ const canvas=document.getElementById('game');
 const ctx=canvas.getContext('2d');
 const W=960,H=540,HORIZON=220,FOCAL=430,CAMERA_HEIGHT=1.48,ROOM_LENGTH=32,CORRIDOR_HALF=4.2;
 const A1_DAMAGE_RADIUS=30,A1_DAMAGE_PER_TICK=10,A1_DAMAGE_INTERVAL=1,NEAR_CLIP=.48;
+const A25_ROOM=25,A25_SPEED=4.8,A25_KILL_DISTANCE=1.35;
 const roomLabel=document.getElementById('room-label'),roomCtx=roomLabel.getContext('2d');
 const statusEl=document.getElementById('status'),healthWrap=document.getElementById('health-wrap'),healthFill=document.getElementById('health-fill');
 const overlay=document.getElementById('overlay'),overlayTitle=document.getElementById('overlay-title'),overlayCopy=document.getElementById('overlay-copy'),overlayEyebrow=document.getElementById('overlay-eyebrow'),resumeBtn=document.getElementById('resume'),muteBtn=document.getElementById('mute'),pauseBtn=document.getElementById('pause');
@@ -81,6 +82,11 @@ function nextRoom(){
  if(doorZ-player.z>2.35){setStatus('DOOR IS TOO FAR');return}
  room++;player.z=doorZ+1.1;player.x=0;doorHint=false;
  sound(330,.08);setTimeout(()=>sound(220,.14),80);updateHud();setStatus('ROOM ENTERED');
+ if(room===A25_ROOM){
+  entity={type:'A-25',x:0,z:room*ROOM_LENGTH+28.5,age:0,phase:'approach',speed:A25_SPEED,clones:[]};
+  setStatus('A-25 APPROACHING — HIDE IN A STEEL CABINET');sound(62,.8,'sawtooth',.035);
+  return;
+ }
  const spawnRate=getEntitySpawnRate('A-1');
  if(!entity&&entityCooldown<=0&&Math.random()<spawnRate){
   entity={type:'A-1',x:rand(-.22,.22),z:(room+1)*ROOM_LENGTH-1.4,age:0,phase:'stare',stareTime:rand(1.3,2.2),speed:ROOM_LENGTH*.58,damaged:false,damageTimer:0,cloneTimer:.08,clones:[]};
@@ -127,28 +133,43 @@ function update(dt){
   setStatus('HIDDEN — PRESS E TO EXIT');statusEl.dataset.state='hidden';
  }
  if(entity){
-  entity.age+=dt;
-  const auraDistance=Math.hypot(entity.x-player.x,entity.z-player.z);
-  if(!isHiding&&auraDistance<=A1_DAMAGE_RADIUS){
-   entity.damageTimer-=dt;
-   if(entity.damageTimer<=0){
-    health=Math.max(0,health-A1_DAMAGE_PER_TICK);shake=8;sound(95,.12,'sawtooth',.025);updateHud();
-    entity.damageTimer=A1_DAMAGE_INTERVAL;
-    if(health<=0){dead=true;running=false;setStatus('LOST');showOverlay('YOU WERE FOUND','A-1 drained your health in room A-'+String(room).padStart(3,'0')+'.','TRY AGAIN','GAME OVER');return}
+  if(entity.type==='A-25'){
+   entity.z-=entity.speed*dt;
+   const passDistance=Math.hypot(entity.x-player.x,entity.z-player.z);
+   if(!isHiding&&passDistance<=A25_KILL_DISTANCE){
+    dead=true;running=false;health=0;updateHud();setStatus('LOST');
+    showOverlay('A-25 FOUND YOU','You must hide inside a steel cabinet to survive room A-025.','TRY AGAIN','GAME OVER');return;
+   }
+   if(entity.z<player.z-2.4){
+    entity=null;entityCooldown=0;setStatus('A-25 PASSED — YOU SURVIVED');
    }
   }else{
-   entity.damageTimer=0;
-  }
-  if(entity.phase==='stare'){
-   if(entity.age>=entity.stareTime){entity.phase='run';entity.age=0;entity.cloneTimer=0;setStatus(isHiding?'HIDDEN — A-1 PASSING':'A-1 IS RUNNING');sound(82,.35,'sawtooth',.028)}
-  }else{
-   entity.z-=entity.speed*dt;
-   entity.cloneTimer-=dt;
-   if(entity.cloneTimer<=0){entity.clones.push({x:entity.x+rand(-.14,.14),z:entity.z+rand(.05,.55),age:0,lift:0,scale:rand(.72,.94)});entity.cloneTimer=.13}
-   for(const clone of entity.clones){clone.age+=dt;clone.lift=Math.min(2.6,clone.lift+dt*1.8)}
-   entity.clones=entity.clones.filter(clone=>clone.age<1.25);
-   if(!isHiding&&Math.hypot(entity.x-player.x,entity.z-player.z)<1.1)entity.damaged=true;
-   if(entity.z<player.z-2.4){entity=null;entityCooldown=10;setStatus(isHiding?'HIDDEN':'QUIET')}
+   entity.age+=dt;
+   const auraDistance=Math.hypot(entity.x-player.x,entity.z-player.z);
+   if(!isHiding&&auraDistance<=A1_DAMAGE_RADIUS){
+    entity.damageTimer-=dt;
+    if(entity.damageTimer<=0){
+     health=Math.max(0,health-A1_DAMAGE_PER_TICK);shake=8;sound(95,.12,'sawtooth',.025);updateHud();
+     entity.damageTimer=A1_DAMAGE_INTERVAL;
+     if(health<=0){dead=true;running=false;setStatus('LOST');showOverlay('YOU WERE FOUND','A-1 drained your health in room A-'+String(room).padStart(3,'0')+'.','TRY AGAIN','GAME OVER');return}
+    }
+   }else{
+    entity.damageTimer=0;
+   }
+   if(entity.phase==='stare'){
+    if(entity.age>=entity.stareTime){entity.phase='run';entity.age=0;entity.cloneTimer=0;setStatus(isHiding?'HIDDEN — A-1 PASSING':'A-1 IS RUNNING');sound(82,.35,'sawtooth',.028)}
+   }else{
+    entity.z-=entity.speed*dt;
+    entity.cloneTimer-=dt;
+    if(entity.cloneTimer<=0){
+     entity.clones.push({x:entity.x+rand(-.14,.14),z:entity.z+rand(.05,.55),age:0,lift:0,scale:rand(.72,.94)});
+     if(entity.clones.length>8)entity.clones.shift();
+     entity.cloneTimer=.2;
+    }
+    for(const clone of entity.clones){clone.age+=dt;clone.lift=Math.min(2.6,clone.lift+dt*1.8)}
+    entity.clones=entity.clones.filter(clone=>clone.age<1.25);
+    if(entity.z<player.z-2.4){entity=null;entityCooldown=10;setStatus(isHiding?'HIDDEN':'QUIET')}
+   }
   }
  }
  if(entityCooldown>0)entityCooldown-=dt;
@@ -364,10 +385,12 @@ function drawEndDoor(){
 }
 function drawA1SpriteAt(worldX,worldZ,height,alpha,baseHeight=0,glow=true){
  if(!a1Sprite.complete||!a1Sprite.naturalWidth)return;
+ const cameraPoint=cameraSpace(worldX,worldZ,baseHeight);
+ if(cameraPoint.forward<1.35||cameraPoint.forward>58)return;
  const base=project(worldX,worldZ,baseHeight),top=project(worldX,worldZ,baseHeight+height);
  if(!base||!top||base.x<-220||base.x>W+220)return;
- const h=base.y-top.y,w=h*(a1Sprite.naturalWidth/a1Sprite.naturalHeight);
- if(h<2)return;
+ const rawHeight=Math.abs(base.y-top.y),h=clamp(rawHeight,0,560),w=clamp(h*(a1Sprite.naturalWidth/a1Sprite.naturalHeight),0,560);
+ if(h<2||w<2||!Number.isFinite(h+w))return;
  const centerY=top.y+h*.52;
  if(glow){
   const radius=clamp(w*.85,12,220),light=ctx.createRadialGradient(base.x,centerY,1,base.x,centerY,radius);
@@ -377,14 +400,46 @@ function drawA1SpriteAt(worldX,worldZ,height,alpha,baseHeight=0,glow=true){
  const pulse=entity&&entity.phase==='stare'?1+Math.sin(entity.age*14)*.012:1;
  ctx.save();ctx.globalAlpha=alpha;ctx.imageSmoothingEnabled=true;ctx.drawImage(a1Sprite,base.x-w*pulse/2,top.y+(h-h*pulse)/2,w*pulse,h*pulse);ctx.restore();
 }
+function drawA25(){
+ if(!entity||entity.type!=='A-25')return;
+ const baseSpace=cameraSpace(entity.x,entity.z,0);
+ if(baseSpace.forward<1.5||baseSpace.forward>58)return;
+ const base=project(entity.x,entity.z,0),top=project(entity.x,entity.z,3.1);
+ if(!base||!top||base.x<-180||base.x>W+180)return;
+ const h=clamp(Math.abs(base.y-top.y),0,500),w=clamp(h*.42,12,180);
+ if(h<2||!Number.isFinite(h+w))return;
+ const headY=top.y+h*.14,bodyTop=top.y+h*.27;
+ ctx.save();
+ const glow=ctx.createRadialGradient(base.x,headY,1,base.x,headY,clamp(w*1.5,15,170));
+ glow.addColorStop(0,'rgba(120,25,25,.36)');glow.addColorStop(1,'rgba(90,0,0,0)');
+ ctx.fillStyle=glow;ctx.beginPath();ctx.arc(base.x,headY,clamp(w*1.5,15,170),0,Math.PI*2);ctx.fill();
+ ctx.fillStyle='#08090b';
+ ctx.beginPath();
+ ctx.moveTo(base.x-w*.28,base.y);ctx.lineTo(base.x-w*.48,bodyTop+h*.25);
+ ctx.lineTo(base.x-w*.34,bodyTop);ctx.lineTo(base.x-w*.23,headY+h*.08);
+ ctx.lineTo(base.x-w*.3,top.y+h*.02);ctx.lineTo(base.x-w*.18,top.y);
+ ctx.lineTo(base.x+w*.18,top.y);ctx.lineTo(base.x+w*.3,top.y+h*.02);
+ ctx.lineTo(base.x+w*.23,headY+h*.08);ctx.lineTo(base.x+w*.34,bodyTop);
+ ctx.lineTo(base.x+w*.48,bodyTop+h*.25);ctx.lineTo(base.x+w*.28,base.y);
+ ctx.closePath();ctx.fill();
+ ctx.fillStyle='#250d0d';ctx.fillRect(base.x-w*.2,headY,w*.4,h*.12);
+ ctx.fillStyle='#d84b42';ctx.shadowColor='#d82d24';ctx.shadowBlur=clamp(w*.18,2,16);
+ ctx.fillRect(base.x-w*.16,headY+h*.045,Math.max(2,w*.075),Math.max(2,h*.018));
+ ctx.fillRect(base.x+w*.085,headY+h*.045,Math.max(2,w*.075),Math.max(2,h*.018));
+ ctx.restore();
+}
 function drawA1(){
- if(!entity)return;
+ if(!entity||entity.type!=='A-1')return;
  for(const clone of entity.clones){
   const fade=clamp(1-clone.age/1.25,0,1),size=clone.scale*(1-clone.age*.18);
-  drawA1SpriteAt(clone.x,clone.z,3.05*size,fade*.62,clone.lift,true);
+  drawA1SpriteAt(clone.x,clone.z,3.05*size,fade*.5,clone.lift,false);
  }
  const flicker=.94+Math.sin(entity.age*19)*.06;
  drawA1SpriteAt(entity.x,entity.z,3.05,entity.phase==='stare'?.99:flicker,0,true);
+}
+function drawEntity(){
+ if(!entity)return;
+ if(entity.type==='A-25')drawA25();else drawA1();
 }
 function drawPixelCanvasText(text,x,baseline,font,color,align){
  const temp=document.createElement('canvas'),measure=temp.getContext('2d');measure.font=font;
@@ -401,7 +456,7 @@ function draw(){
  ctx.fillStyle=ceiling;ctx.fillRect(0,0,W,HORIZON+2);
  const floorShade=ctx.createLinearGradient(0,HORIZON,0,H);floorShade.addColorStop(0,'#435c4a');floorShade.addColorStop(1,'#1f3027');
  ctx.fillStyle=floorShade;ctx.fillRect(0,HORIZON,W,H-HORIZON);
- drawCeiling();drawFloor();drawSideWalls();drawEndDoor();drawPreviousDoor();drawA1();drawClosets();drawLobbyDesk();drawHidingView();
+ drawCeiling();drawFloor();drawSideWalls();drawEndDoor();drawPreviousDoor();drawEntity();drawClosets();drawLobbyDesk();drawHidingView();
  ctx.restore();
  ctx.save();
  const darkness=ctx.createRadialGradient(W/2,H*.58,35,W/2,H*.58,flashlight?410:225);
