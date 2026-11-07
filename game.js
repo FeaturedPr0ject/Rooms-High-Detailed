@@ -86,8 +86,8 @@ function hurt(amount=15){
 function startA25Encounter(targetRoom){
  a25Started=true;a25Completed=false;entityCooldown=0;
  const targetEnd=(targetRoom+1)*ROOM_LENGTH-.8;
- entity={type:'A-25',x:0,z:targetRoom*ROOM_LENGTH+ROOM_LENGTH*.5,age:0,direction:1,targetRoom,targetZ:targetEnd,rebounds:0,particleTimer:0,particles:[],speed:A25_SPEED};
- setStatus('A-25 SPAWNED IN ROOM A-'+String(targetRoom).padStart(3,'0')+' — HIDE NOW');
+ entity={type:'A-25',x:0,z:1.2,age:0,direction:1,targetRoom,targetZ:targetEnd,rebounds:0,particleTimer:0,particles:[],speed:A25_SPEED};
+ setStatus('A-25 SPAWNED IN THE LOBBY — HIDE NOW');
  sound(62,.8,'sawtooth',.035);
 }
 function teleportToRoom(targetRoom){
@@ -199,10 +199,10 @@ function update(dt){
   const targetRoom=Math.max(0,Math.floor(Math.max(0,nextZ)/ROOM_LENGTH));
   if(targetRoom>oldRoom){
    const boundary=(oldRoom+1)*ROOM_LENGTH;
-   if(!doorIsOpen(boundary)||Math.abs(nextX)>.48)nextZ=Math.min(nextZ,boundary-.8);
+   if(!doorIsOpen(boundary)||Math.abs(nextX)>.70)nextZ=Math.min(nextZ,boundary-.8);
   }else if(targetRoom<oldRoom){
    const boundary=oldRoom*ROOM_LENGTH;
-   if(!doorIsOpen(boundary)||Math.abs(nextX)>.48)nextZ=Math.max(nextZ,boundary+.8);
+   if(!doorIsOpen(boundary)||Math.abs(nextX)>.70)nextZ=Math.max(nextZ,boundary+.8);
   }
   nextZ=Math.max(nextZ,retainedRoomFloor()*ROOM_LENGTH+.45);
   const half=halfWidthAt(nextZ);
@@ -489,7 +489,7 @@ function drawHidingView(){
  ctx.restore();
 }
 function drawDoorLeaf(boundary,state){
- const angle=state?state.angle:0,swing=state?state.swing:1,width=1.12,hinge=-.56;
+ const angle=state?state.angle:0,swing=state?state.swing:1,width=1.60,hinge=-.80;
  const point=(offset,height)=>[hinge+Math.cos(angle)*offset,boundary+swing*Math.sin(angle)*offset,height];
  worldPolygon([point(0,0),point(width,0),point(width,2.28),point(0,2.28)],'#9a7952','#d7bf84');
  worldPolygon([point(.12,.2),point(width-.12,.2),point(width-.12,2.08),point(.12,2.08)],'#b08c5c','#d1b77b');
@@ -498,18 +498,22 @@ function drawDoorLeaf(boundary,state){
 }
 function drawDoorSign(boundary,roomNumber,faceSide){
  const z=boundary+faceSide*.035;
- worldPolygon([[-.53,z,2.3],[.53,z,2.3],[.53,z,2.62],[-.53,z,2.62]],'#d4b66c','#6c4e2e');
+ worldPolygon([[-.68,z,2.3],[.68,z,2.3],[.68,z,2.62],[-.68,z,2.62]],'#d4b66c','#6c4e2e');
  const label=project(0,z,2.46);
  if(label){ctx.save();ctx.fillStyle='#49351f';ctx.font='700 '+clamp(label.scale*.105,7,14)+'px Arial';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText('A-'+String(roomNumber).padStart(3,'0'),label.x,label.y);ctx.restore()}
 }
 function drawDoorway(boundary,roomNumber,faceSide,forceClosed=false){
  const p=ROOM_MATERIAL,half=halfWidthAt(boundary);
- worldPolygon([[-half,boundary,0],[-.66,boundary,0],[-.66,boundary,3.6],[-half,boundary,3.6]],p.wall[0],p.edge);
- worldPolygon([[.66,boundary,0],[half,boundary,0],[half,boundary,3.6],[.66,boundary,3.6]],p.wall[1],p.edge);
- worldPolygon([[-.66,boundary,2.28],[.66,boundary,2.28],[.66,boundary,3.6],[-.66,boundary,3.6]],p.wall[2],p.edge);
- worldLine([-.66,boundary,0],[-.66,boundary,2.3],p.doorEdge,3);
- worldLine([.66,boundary,0],[.66,boundary,2.3],p.doorEdge,3);
- worldLine([-.66,boundary,2.28],[.66,boundary,2.28],p.doorEdge,3);
+ worldPolygon([[-half,boundary,0],[-.82,boundary,0],[-.82,boundary,3.6],[-half,boundary,3.6]],p.wall[0],p.edge);
+ worldPolygon([[.82,boundary,0],[half,boundary,0],[half,boundary,3.6],[.82,boundary,3.6]],p.wall[1],p.edge);
+ worldPolygon([[-.82,boundary,2.28],[.82,boundary,2.28],[.82,boundary,3.6],[-.82,boundary,3.6]],p.wall[2],p.edge);
+ worldPolygon([[-.82,boundary,0],[-.82,boundary+.18,0],[-.82,boundary+.18,2.28],[-.82,boundary,2.28]],'#806044','#d7bf84');
+ worldPolygon([[.82,boundary,0],[.82,boundary,2.28],[.82,boundary+.18,2.28],[.82,boundary+.18,0]],'#806044','#d7bf84');
+ worldPolygon([[-.82,boundary,2.28],[.82,boundary,2.28],[.82,boundary+.18,2.28],[-.82,boundary+.18,2.28]],'#806044','#d7bf84');
+ worldPolygon([[-.82,boundary,0],[.82,boundary,0],[.82,boundary+.18,0],[-.82,boundary+.18,0]],'#95784e','#d7bf84');
+ worldLine([-.82,boundary,0],[-.82,boundary,2.3],p.doorEdge,3);
+ worldLine([.82,boundary,0],[.82,boundary,2.3],p.doorEdge,3);
+ worldLine([-.82,boundary,2.28],[.82,boundary,2.28],p.doorEdge,3);
  drawDoorLeaf(boundary,forceClosed?null:doorStates.get(boundary));
  drawDoorSign(boundary,roomNumber,faceSide);
 }
@@ -588,7 +592,8 @@ function drawA25(){
  const base=project(drawX,entity.z,0),top=project(drawX,entity.z,3.2);
  if(!base||!top||base.x<-200||base.x>W+200)return;
  const h=clamp(Math.abs(base.y-top.y),2,500);
- const w=clamp(h*(a25Sprite.naturalWidth/a25Sprite.naturalHeight),2,480);
+ const spriteAspect=a25Sprite.complete&&a25Sprite.naturalWidth&&a25Sprite.naturalHeight?a25Sprite.naturalWidth/a25Sprite.naturalHeight:.62;
+ const w=clamp(h*spriteAspect,2,480);
  if(h<2||w<2||!Number.isFinite(h+w))return;
  const centerY=top.y+h*.5,radius=clamp(w*1.25,24,210);
  ctx.save();ctx.globalCompositeOperation='screen';
