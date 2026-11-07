@@ -14,6 +14,7 @@ let a25Started=false,a25Completed=false;
 const player={x:0,z:5,yaw:0,speed:3.25};
 const doorStates=new Map();
 function retainedRoomFloor(){return Math.max(0,furthestRoom-ROOMS_KEPT_BEHIND)}
+function pruneDoorStates(){const minimum=retainedRoomFloor()*ROOM_LENGTH;for(const boundary of doorStates.keys())if(boundary<minimum)doorStates.delete(boundary)}
 function doorIsOpen(boundary){const state=doorStates.get(boundary);return !!state&&state.angle>=1.12}
 let viewPitch=0,rightDragging=false,lastPointerX=0,lastPointerY=0;
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
@@ -210,7 +211,7 @@ function update(dt){
   const nextRoomIndex=Math.max(0,Math.floor(player.z/ROOM_LENGTH));
   if(nextRoomIndex!==room){
    const previousRoom=room;room=nextRoomIndex;updateHud();doorHint=false;delete statusEl.dataset.state;
-   if(room>furthestRoom){furthestRoom=room;handleRoomEntered(room)}
+   if(room>furthestRoom){furthestRoom=room;pruneDoorStates();handleRoomEntered(room)}
    else setStatus('RETURNED TO '+(room===0?'LOBBY':'ROOM A-'+String(room).padStart(3,'0')));
   }
   const nearby=findNearbyCloset(),nearbyDesk=findNearbyDesk(),door=nearbyDoor();
@@ -501,7 +502,7 @@ function drawDoorSign(boundary,roomNumber,faceSide){
  const label=project(0,z,2.46);
  if(label){ctx.save();ctx.fillStyle='#49351f';ctx.font='700 '+clamp(label.scale*.105,7,14)+'px Arial';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText('A-'+String(roomNumber).padStart(3,'0'),label.x,label.y);ctx.restore()}
 }
-function drawDoorway(boundary,roomNumber,faceSide){
+function drawDoorway(boundary,roomNumber,faceSide,forceClosed=false){
  const p=ROOM_MATERIAL,half=halfWidthAt(boundary);
  worldPolygon([[-half,boundary,0],[-.66,boundary,0],[-.66,boundary,3.6],[-half,boundary,3.6]],p.wall[0],p.edge);
  worldPolygon([[.66,boundary,0],[half,boundary,0],[half,boundary,3.6],[.66,boundary,3.6]],p.wall[1],p.edge);
@@ -509,13 +510,13 @@ function drawDoorway(boundary,roomNumber,faceSide){
  worldLine([-.66,boundary,0],[-.66,boundary,2.3],p.doorEdge,3);
  worldLine([.66,boundary,0],[.66,boundary,2.3],p.doorEdge,3);
  worldLine([-.66,boundary,2.28],[.66,boundary,2.28],p.doorEdge,3);
- drawDoorLeaf(boundary,doorStates.get(boundary));
+ drawDoorLeaf(boundary,forceClosed?null:doorStates.get(boundary));
  drawDoorSign(boundary,roomNumber,faceSide);
 }
 function drawPreviousDoor(){
  if(room<=0)return;
  const boundary=room*ROOM_LENGTH;
- drawDoorway(boundary,room,1);
+ drawDoorway(boundary,room,1,room<=retainedRoomFloor());
 }
 function drawEndDoor(){
  const boundary=(room+1)*ROOM_LENGTH;
