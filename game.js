@@ -108,9 +108,10 @@ function spawnAdminEntity(){
  const selected=adminEntitySelect.value;
  entityCooldown=0;
  if(selected==='A-1'){
-  entity={type:'A-1',x:0,z:player.z+14,age:0,phase:'run',speed:ROOM_LENGTH*.58,damaged:false,damageTimer:0,cloneTimer:.08,clones:[]};
+  const spawnRoom=Math.max(1,room);
+  entity={type:'A-1',x:0,z:spawnRoom*ROOM_LENGTH+ROOM_LENGTH*.5,age:0,phase:'stare',stareTime:2,speed:ROOM_LENGTH*.58,damaged:false,damageTimer:0,cloneTimer:.08,clones:[]};
   setStatus('ADMIN SPAWNED A-1');
-  adminFeedback.textContent='A-1 SPAWNED IN FRONT OF PLAYER';
+  adminFeedback.textContent='A-1 SPAWNS IN ROOM CENTER — 2 SECOND WARNING';
  }else if(selected==='A-25'||selected==='C-25'){
   const spawnRoom=Math.max(1,room);
   startA25Encounter(spawnRoom,false,selected==='C-25');
@@ -151,8 +152,8 @@ function handleRoomEntered(nextRoomNumber){
  if(nextRoomNumber>=A25_ROOM&&!entity&&!a25Started&&Math.random()<.32){startA25Encounter(nextRoomNumber);return}
  const spawnRate=getEntitySpawnRate('A-1');
  if(!entity&&entityCooldown<=0&&Math.random()<spawnRate){
-  entity={type:'A-1',x:0,z:(nextRoomNumber+1)*ROOM_LENGTH-1.4,age:0,phase:'run',speed:ROOM_LENGTH*.58,damaged:false,damageTimer:0,cloneTimer:.08,clones:[]};
-  setStatus('A-1 IS WATCHING');sound(118,.42,'sawtooth',.018);
+  entity={type:'A-1',x:0,z:nextRoomNumber*ROOM_LENGTH+ROOM_LENGTH*.5,age:0,phase:'stare',stareTime:2,speed:ROOM_LENGTH*.58,damaged:false,damageTimer:0,cloneTimer:.08,clones:[]};
+  setStatus('A-1 IS WATCHING — 2 SECONDS');sound(118,.42,'sawtooth',.018);
  }
 }
 function onKey(e,down){
