@@ -260,9 +260,9 @@ function update(dt){
    entity.age+=dt;
    entity.particleTimer-=dt;
    if(entity.particleTimer<=0){
-    entity.particles.push({x:entity.x+rand(-1.15,1.15),z:entity.z-entity.direction*rand(.2,1.7),height:rand(.2,3.35),age:0,life:rand(1.2,2.1),scale:rand(.9,1.7),variant:Math.floor(Math.random()*2)});
-    if(entity.particles.length>96)entity.particles.shift();
-    entity.particleTimer=.035;
+    entity.particles.push({x:entity.x+rand(-1.15,1.15),z:entity.z-entity.direction*rand(.2,1.7),height:rand(.2,3.35),age:0,life:rand(.9,1.35),scale:rand(.65,1.05),variant:Math.floor(Math.random()*2),frame:Math.floor(Math.random()*16)});
+    if(entity.particles.length>48)entity.particles.shift();
+    entity.particleTimer=.07;
    }
    for(const particle of entity.particles){particle.age+=dt;particle.z-=entity.direction*dt*.75}
    entity.particles=entity.particles.filter(particle=>particle.age<particle.life);
@@ -619,11 +619,11 @@ function drawA1SpriteAt(worldX,worldZ,height,alpha,baseHeight=0,glow=true){
  if(cameraPoint.forward<1.35||cameraPoint.forward>58)return;
  const base=project(worldX,worldZ,baseHeight),top=project(worldX,worldZ,baseHeight+height);
  if(!base||!top||base.x<-220||base.x>W+220)return;
- const rawHeight=Math.abs(base.y-top.y),h=clamp(rawHeight,0,560),w=clamp(h*(a1Sprite.naturalWidth/a1Sprite.naturalHeight),0,560);
+ const rawHeight=Math.abs(base.y-top.y),h=clamp(rawHeight,0,340),w=clamp(h*(a1Sprite.naturalWidth/a1Sprite.naturalHeight),0,420);
  if(h<2||w<2||!Number.isFinite(h+w))return;
  const centerY=top.y+h*.52;
  if(glow){
-  const radius=clamp(w*.85,12,220);
+  const radius=clamp(w*.85,12,160);
   ctx.save();ctx.globalCompositeOperation='screen';ctx.globalAlpha=alpha;
   ctx.drawImage(a1GlowCanvas,base.x-radius,centerY-radius,radius*2,radius*2);
   ctx.restore();
@@ -637,11 +637,11 @@ function drawA25Particle(particle){
  const point=project(particle.x,particle.z,particle.height);
  if(!point||point.forward>58||point.x<-220||point.x>W+220)return;
  const fade=clamp(1-particle.age/particle.life,0,1);
- const size=clamp(point.scale*particle.scale*2.25,8,220);
+ const size=clamp(point.scale*particle.scale*1.25,6,88);
  const aspect=sprite&&sprite.complete&&sprite.naturalWidth?sprite.naturalWidth/sprite.naturalHeight:1;
  const width=clamp(size*aspect,8,260);
  if(!Number.isFinite(width))return;
- const glowRadius=clamp(size*.82,12,145);
+ const glowRadius=clamp(size*.72,8,70);
  ctx.save();
  ctx.globalCompositeOperation='lighter';
  ctx.globalAlpha=fade*.9;
@@ -668,8 +668,11 @@ function drawA25Particle(particle){
  ctx.globalCompositeOperation='lighter';
  ctx.globalAlpha=fade*.98;
  if(sprite&&sprite.complete&&sprite.naturalWidth){
-  if(isC25)ctx.filter='hue-rotate(185deg) saturate(2.5) brightness(1.18)';
-  ctx.drawImage(sprite,point.x-width/2,point.y-size/2,width,size);
+  const columns=4,rows=4,frame=clamp(particle.frame??0,0,15);
+  const sourceWidth=sprite.naturalWidth/columns,sourceHeight=sprite.naturalHeight/rows;
+  const sourceX=(frame%columns)*sourceWidth,sourceY=Math.floor(frame/columns)*sourceHeight;
+  ctx.filter=isC25?'brightness(0) saturate(100%) invert(23%) sepia(100%) saturate(6000%) hue-rotate(260deg) brightness(105%) contrast(108%)':'brightness(0) saturate(100%) invert(74%) sepia(94%) saturate(1200%) hue-rotate(65deg) brightness(108%) contrast(105%)';
+  ctx.drawImage(sprite,sourceX,sourceY,sourceWidth,sourceHeight,point.x-width/2,point.y-size/2,width,size);
  }else{
   const radius=size*.42;
   const core=ctx.createRadialGradient(point.x,point.y,1,point.x,point.y,radius);
@@ -715,7 +718,7 @@ function drawA25(){
  ctx.fillStyle=glow;ctx.beginPath();ctx.arc(base.x,centerY,radius,0,Math.PI*2);ctx.fill();ctx.restore();
  ctx.save();ctx.globalAlpha=.98;ctx.imageSmoothingEnabled=true;
  if(sprite.complete&&sprite.naturalWidth){
-  if(isC25)ctx.filter='hue-rotate(60deg) saturate(2.5) brightness(1.18)';
+  
   ctx.drawImage(sprite,base.x-w/2,top.y,w,h);
  }else{
   ctx.fillStyle=isC25?'rgba(255,65,220,.82)':'rgba(45,245,85,.68)';
