@@ -192,9 +192,27 @@ adminForm.addEventListener('submit',event=>{
  adminRoomInput.setCustomValidity('');teleportToRoom(value);
 });
 adminSpawnButton.addEventListener('click',spawnAdminEntity);
+const touchControls=document.getElementById('touch-controls');
+const touchE=document.getElementById('touch-e'),touchF=document.getElementById('touch-f');
+function releaseTouchControl(button){
+ const key=button.dataset.touchKey;
+ if(key){keys[key]=false;button.classList.remove('pressed')}
+}
+touchControls.querySelectorAll('[data-touch-key]').forEach(button=>{
+ button.addEventListener('pointerdown',event=>{
+  event.preventDefault();event.stopPropagation();
+  const key=button.dataset.touchKey;keys[key]=true;button.classList.add('pressed');
+  button.setPointerCapture(event.pointerId);
+ });
+ button.addEventListener('pointerup',()=>releaseTouchControl(button));
+ button.addEventListener('pointercancel',()=>releaseTouchControl(button));
+ button.addEventListener('lostpointercapture',()=>releaseTouchControl(button));
+});
+touchE.addEventListener('click',event=>{event.preventDefault();if(!paused&&!dead)interact()});
+touchF.addEventListener('click',event=>{event.preventDefault();if(!paused&&!dead){flashlight=!flashlight;sound(420,.045);touchF.classList.toggle('pressed',flashlight)}});
 canvas.addEventListener('click',()=>{if(!paused&&!dead)canvas.focus()});
 canvas.addEventListener('contextmenu',e=>e.preventDefault());
-canvas.addEventListener('pointerdown',e=>{if(e.button!==2)return;rightDragging=true;lastPointerX=e.clientX;lastPointerY=e.clientY;canvas.setPointerCapture(e.pointerId);e.preventDefault()});
+canvas.addEventListener('pointerdown',e=>{if(e.pointerType==='touch'||e.button===2){rightDragging=true;lastPointerX=e.clientX;lastPointerY=e.clientY;canvas.setPointerCapture(e.pointerId);e.preventDefault()}});
 canvas.addEventListener('pointermove',e=>{if(!rightDragging)return;const dx=e.clientX-lastPointerX,dy=e.clientY-lastPointerY;lastPointerX=e.clientX;lastPointerY=e.clientY;player.yaw+=dx*.0065;viewPitch=clamp(viewPitch-dy*1.05,-185,185)});
 const stopRightDrag=()=>{rightDragging=false};
 canvas.addEventListener('pointerup',stopRightDrag);canvas.addEventListener('pointercancel',stopRightDrag);
