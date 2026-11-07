@@ -2,7 +2,7 @@
 const canvas=document.getElementById('game');
 const ctx=canvas.getContext('2d');
 const W=960,H=540,HORIZON=220,FOCAL=430,CAMERA_HEIGHT=1.48,ROOM_LENGTH=32,CORRIDOR_HALF=4.2;
-const A1_DAMAGE_RADIUS=1,A1_DAMAGE_PER_TICK=10,A1_DAMAGE_INTERVAL=1,NEAR_CLIP=.48;
+const A1_DAMAGE_RADIUS=4,A1_DAMAGE_PER_TICK=10,A1_DAMAGE_INTERVAL=1,NEAR_CLIP=.48;
 const A25_ROOM=25,A25_SPEED=4.8,A25_KILL_DISTANCE=1.35;
 const roomLabel=document.getElementById('room-label'),roomCtx=roomLabel.getContext('2d');
 const statusEl=document.getElementById('status'),healthWrap=document.getElementById('health-wrap'),healthFill=document.getElementById('health-fill');
