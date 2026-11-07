@@ -3,7 +3,7 @@ const canvas=document.getElementById('game');
 const ctx=canvas.getContext('2d');
 const W=960,H=540,HORIZON=220,FOCAL=430,CAMERA_HEIGHT=1.48,ROOM_LENGTH=32,CORRIDOR_HALF=4.2;
 const A1_DAMAGE_RADIUS=4,A1_DAMAGE_PER_TICK=10,A1_DAMAGE_INTERVAL=1,NEAR_CLIP=.48;
-const A25_ROOM=25,A25_SPEED=24,A25_DAMAGE_RADIUS=10,ROOMS_KEPT_BEHIND=2;
+const A25_ROOM=25,A25_SPEED=24,C25_SPEED=40,A25_DAMAGE_RADIUS=10,C25_SPAWN_CHANCE=.012,ROOMS_KEPT_BEHIND=2;
 const roomLabel=document.getElementById('room-label'),roomCtx=roomLabel.getContext('2d');
 const statusEl=document.getElementById('status'),healthWrap=document.getElementById('health-wrap'),healthFill=document.getElementById('health-fill');
 const overlay=document.getElementById('overlay'),overlayTitle=document.getElementById('overlay-title'),overlayCopy=document.getElementById('overlay-copy'),overlayEyebrow=document.getElementById('overlay-eyebrow'),resumeBtn=document.getElementById('resume'),muteBtn=document.getElementById('mute'),pauseBtn=document.getElementById('pause');
@@ -89,12 +89,13 @@ function hurt(amount=15){
  if(health<=0){dead=true;running=false;setStatus('LOST');showOverlay('YOU WERE FOUND','Your run ended in room A-'+String(room).padStart(3,'0')+'.','TRY AGAIN','GAME OVER')}
  else{setStatus('DANGER');player.z=Math.max(room*ROOM_LENGTH+.8,player.z-1.5);entityCooldown=7}
 }
-function startA25Encounter(targetRoom){
+function startA25Encounter(targetRoom,allowC25=true){
  a25Started=true;a25Completed=false;entityCooldown=0;
- const targetEnd=(targetRoom+1)*ROOM_LENGTH-.8;
- entity={type:'A-25',x:0,z:1.2,age:0,direction:1,targetRoom,targetZ:targetEnd,rebounds:0,particleTimer:0,particles:[],speed:A25_SPEED};
- setStatus('A-25 SPAWNED IN THE LOBBY — HIDE NOW');
- sound(62,.8,'sawtooth',.035);
+ const isC25=allowC25&&Math.random()<C25_SPAWN_CHANCE;
+ const type=isC25?'C-25':'A-25',targetEnd=(targetRoom+1)*ROOM_LENGTH-.8;
+ entity={type,x:0,z:1.2,age:0,direction:1,targetRoom,targetZ:targetEnd,rebounds:0,particleTimer:0,particles:[],speed:isC25?C25_SPEED:A25_SPEED,reboundLimit:isC25?5:2};
+ setStatus(type+' SPAWNED IN THE LOBBY — HIDE NOW');
+ sound(isC25?92:62,.8,'sawtooth',.035);
 }
 function teleportToRoom(targetRoom){
  if(!Number.isInteger(targetRoom)||targetRoom<0||targetRoom>999){setStatus('INVALID ROOM NUMBER');return}
@@ -112,7 +113,7 @@ function spawnAdminEntity(){
   adminFeedback.textContent='A-1 SPAWNED IN FRONT OF PLAYER';
  }else if(selected==='A-25'){
   const spawnRoom=Math.max(1,room),targetZ=(spawnRoom+1)*ROOM_LENGTH-.8;
-  startA25Encounter(spawnRoom);
+  startA25Encounter(spawnRoom,false);
   setStatus('ADMIN SPAWNED A-25');
   adminFeedback.textContent='A-25 SPAWNED — HIDE IN A STEEL CABINET';
  }else{
@@ -236,7 +237,7 @@ function update(dt){
   setStatus('HIDDEN — PRESS E TO EXIT');statusEl.dataset.state='hidden';
  }
  if(entity){
-  if(entity.type==='A-25'){
+  if(entity.type==='A-25'||entity.type==='C-25'){
    entity.age+=dt;
    entity.particleTimer-=dt;
    if(entity.particleTimer<=0){
@@ -249,26 +250,35 @@ function update(dt){
    entity.z+=entity.direction*entity.speed*dt;
    if(entity.direction>0&&entity.z>=entity.targetZ){
     entity.z=entity.targetZ;
-    if(entity.rebounds===0){
+    if(entity.type==='C-25'){
+     if(entity.rebounds>=entity.reboundLimit){entity=null;a25Completed=true;a25Started=false;setStatus('C-25 PASSED — ENCOUNTER CLEARED')}
+     else{entity.rebounds++;entity.direction=-1;entity.targetZ=.8;setStatus('C-25 REBOUND '+entity.rebounds+'/5 — RETURNING TO LOBBY')}
+    }else if(entity.rebounds===0){
      entity.rebounds=1;entity.direction=-1;entity.targetZ=.8;
      setStatus('A-25 REBOUNDS — RUNNING BACK TO THE LOBBY');
     }else if(entity.rebounds===2){
      entity=null;a25Completed=true;a25Started=false;setStatus('A-25 PASSED — ROOM CLEARED');
     }
    }else if(entity.direction<0&&entity.z<=entity.targetZ){
-    entity.z=entity.targetZ;entity.rebounds=2;
-    entity.direction=1;entity.targetZ=(entity.targetRoom+1)*ROOM_LENGTH-.8;
-    setStatus('A-25 REBOUNDS AT THE LOBBY — FINAL PASS');
+    entity.z=entity.targetZ;
+    if(entity.type==='C-25'){
+     if(entity.rebounds>=entity.reboundLimit){entity=null;a25Completed=true;a25Started=false;setStatus('C-25 PASSED — ENCOUNTER CLEARED')}
+     else{entity.rebounds++;entity.direction=1;entity.targetZ=(entity.targetRoom+1)*ROOM_LENGTH-.8;setStatus('C-25 REBOUND '+entity.rebounds+'/5 — CHARGING TO THE DOOR')}
+    }else{
+     entity.rebounds=2;
+     entity.direction=1;entity.targetZ=(entity.targetRoom+1)*ROOM_LENGTH-.8;
+     setStatus('A-25 REBOUNDS AT THE LOBBY — FINAL PASS');
+    }
    }
    if(entity&&!isHiding&&!godMode&&hideExitGrace<=0&&Math.hypot(entity.x-player.x,entity.z-player.z)<=A25_DAMAGE_RADIUS){
     dead=true;running=false;health=0;updateHud();setStatus('LOST');
-    showOverlay('A-25 FOUND YOU','Stay inside a steel cabinet for both passes.','TRY AGAIN','GAME OVER');return;
+    showOverlay(entity.type+' FOUND YOU','Stay hidden until the entity has passed.','TRY AGAIN','GAME OVER');return;
    }
    if(entity){
     const distance=Math.hypot(entity.x-player.x,entity.z-player.z);
     if(distance<=A25_DAMAGE_RADIUS){
      shake=Math.max(shake,(1-distance/A25_DAMAGE_RADIUS)*22+1.5);
-     if(!isHiding)setStatus('A-25 NEAR — HIDE NOW');
+     if(!isHiding)setStatus(entity.type+' NEAR — HIDE NOW');
     }
    }
   }else{
@@ -578,6 +588,9 @@ a1Sprite.src='./assets/a1.webp';
 const a25Sprite=new Image();
 a25Sprite.decoding='async';
 a25Sprite.src='./assets/a25.webp';
+const c25Sprite=new Image();
+c25Sprite.decoding='async';
+c25Sprite.src='./assets/c25.webp';
 const a25ParticleSprites=[new Image(),new Image()];
 a25ParticleSprites[0].src='./assets/parct251.webp';
 a25ParticleSprites[1].src='./assets/parct252.webp';
@@ -600,6 +613,7 @@ function drawA1SpriteAt(worldX,worldZ,height,alpha,baseHeight=0,glow=true){
  ctx.save();ctx.globalAlpha=alpha;ctx.imageSmoothingEnabled=true;ctx.drawImage(a1Sprite,base.x-w*pulse/2,top.y+(h-h*pulse)/2,w*pulse,h*pulse);ctx.restore();
 }
 function drawA25Particle(particle){
+ const isC25=entity&&entity.type==='C-25';
  const sprite=a25ParticleSprites[particle.variant];
  const point=project(particle.x,particle.z,particle.height);
  if(!point||point.forward>58||point.x<-220||point.x>W+220)return;
@@ -611,34 +625,51 @@ function drawA25Particle(particle){
  const glowRadius=clamp(size*.82,12,145);
  ctx.save();
  ctx.globalCompositeOperation='lighter';
- ctx.globalAlpha=fade*.88;
+ ctx.globalAlpha=fade*.9;
  const glow=ctx.createRadialGradient(point.x,point.y,1,point.x,point.y,glowRadius);
- glow.addColorStop(0,'rgba(90,255,105,.95)');
- glow.addColorStop(.34,'rgba(35,255,65,.72)');
- glow.addColorStop(.72,'rgba(0,225,45,.28)');
- glow.addColorStop(1,'rgba(0,200,35,0)');
+ if(isC25){
+  glow.addColorStop(0,'rgba(255,190,255,.98)');
+  glow.addColorStop(.34,'rgba(255,70,220,.85)');
+  glow.addColorStop(.72,'rgba(185,35,255,.42)');
+  glow.addColorStop(1,'rgba(145,0,230,0)');
+  ctx.strokeStyle='rgba(255,110,235,.98)';
+ }else{
+  glow.addColorStop(0,'rgba(90,255,105,.95)');
+  glow.addColorStop(.34,'rgba(35,255,65,.72)');
+  glow.addColorStop(.72,'rgba(0,225,45,.28)');
+  glow.addColorStop(1,'rgba(0,200,35,0)');
+  ctx.strokeStyle='rgba(50,255,85,.9)';
+ }
  ctx.fillStyle=glow;ctx.beginPath();ctx.arc(point.x,point.y,glowRadius,0,Math.PI*2);ctx.fill();
  ctx.globalAlpha=fade*.94;
- ctx.strokeStyle='rgba(50,255,85,.9)';
  ctx.lineWidth=clamp(size*.035,1.5,7);
  ctx.beginPath();ctx.arc(point.x,point.y,size*.34,0,Math.PI*2);ctx.stroke();
  ctx.restore();
  ctx.save();
  ctx.globalCompositeOperation='lighter';
  ctx.globalAlpha=fade*.98;
- if(sprite&&sprite.complete&&sprite.naturalWidth)ctx.drawImage(sprite,point.x-width/2,point.y-size/2,width,size);
- else{
+ if(sprite&&sprite.complete&&sprite.naturalWidth){
+  if(isC25)ctx.filter='hue-rotate(185deg) saturate(2.5) brightness(1.18)';
+  ctx.drawImage(sprite,point.x-width/2,point.y-size/2,width,size);
+ }else{
   const radius=size*.42;
   const core=ctx.createRadialGradient(point.x,point.y,1,point.x,point.y,radius);
-  core.addColorStop(0,'rgba(145,255,125,1)');
-  core.addColorStop(.55,'rgba(35,255,60,.92)');
-  core.addColorStop(1,'rgba(0,205,30,0)');
+  if(isC25){
+   core.addColorStop(0,'rgba(255,220,255,1)');
+   core.addColorStop(.55,'rgba(255,65,220,.96)');
+   core.addColorStop(1,'rgba(155,0,255,0)');
+  }else{
+   core.addColorStop(0,'rgba(145,255,125,1)');
+   core.addColorStop(.55,'rgba(35,255,60,.92)');
+   core.addColorStop(1,'rgba(0,205,30,0)');
+  }
   ctx.fillStyle=core;ctx.beginPath();ctx.arc(point.x,point.y,radius,0,Math.PI*2);ctx.fill();
  }
  ctx.restore();
 }
 function drawA25(){
- if(!entity||entity.type!=='A-25')return;
+ if(!entity||(entity.type!=='A-25'&&entity.type!=='C-25'))return;
+ const isC25=entity.type==='C-25',sprite=isC25?c25Sprite:a25Sprite;
  for(const particle of entity.particles)drawA25Particle(particle);
  const wobble=Math.sin(entity.age*34)*.13+Math.sin(entity.age*57)*.055;
  const drawX=entity.x+wobble;
@@ -647,19 +678,31 @@ function drawA25(){
  const base=project(drawX,entity.z,0),top=project(drawX,entity.z,3.2);
  if(!base||!top||base.x<-200||base.x>W+200)return;
  const h=clamp(Math.abs(base.y-top.y),2,500);
- const spriteAspect=a25Sprite.complete&&a25Sprite.naturalWidth&&a25Sprite.naturalHeight?a25Sprite.naturalWidth/a25Sprite.naturalHeight:.62;
+ const spriteAspect=sprite.complete&&sprite.naturalWidth&&sprite.naturalHeight?sprite.naturalWidth/sprite.naturalHeight:.62;
  const w=clamp(h*spriteAspect,2,480);
  if(h<2||w<2||!Number.isFinite(h+w))return;
  const centerY=top.y+h*.5,radius=clamp(w*1.25,24,210);
- ctx.save();ctx.globalCompositeOperation='screen';
+ ctx.save();ctx.globalCompositeOperation=isC25?'lighter':'screen';
  const glow=ctx.createRadialGradient(base.x,centerY,1,base.x,centerY,radius);
- glow.addColorStop(0,'rgba(74,255,105,.48)');
- glow.addColorStop(.38,'rgba(37,225,75,.24)');
- glow.addColorStop(1,'rgba(30,210,65,0)');
+ if(isC25){
+  glow.addColorStop(0,'rgba(255,190,255,.88)');
+  glow.addColorStop(.38,'rgba(255,55,220,.58)');
+  glow.addColorStop(1,'rgba(155,0,255,0)');
+ }else{
+  glow.addColorStop(0,'rgba(74,255,105,.48)');
+  glow.addColorStop(.38,'rgba(37,225,75,.24)');
+  glow.addColorStop(1,'rgba(30,210,65,0)');
+ }
  ctx.fillStyle=glow;ctx.beginPath();ctx.arc(base.x,centerY,radius,0,Math.PI*2);ctx.fill();ctx.restore();
  ctx.save();ctx.globalAlpha=.98;ctx.imageSmoothingEnabled=true;
- if(a25Sprite.complete&&a25Sprite.naturalWidth)ctx.drawImage(a25Sprite,base.x-w/2,top.y,w,h);
- else{ctx.fillStyle='rgba(45,245,85,.68)';ctx.fillRect(base.x-w*.18,top.y+h*.12,w*.36,h*.82);ctx.beginPath();ctx.arc(base.x,top.y+h*.1,w*.19,0,Math.PI*2);ctx.fill()}
+ if(sprite.complete&&sprite.naturalWidth){
+  if(isC25)ctx.filter='hue-rotate(185deg) saturate(2.5) brightness(1.18)';
+  ctx.drawImage(sprite,base.x-w/2,top.y,w,h);
+ }else{
+  ctx.fillStyle=isC25?'rgba(255,65,220,.82)':'rgba(45,245,85,.68)';
+  ctx.fillRect(base.x-w*.18,top.y+h*.12,w*.36,h*.82);
+  ctx.beginPath();ctx.arc(base.x,top.y+h*.1,w*.19,0,Math.PI*2);ctx.fill();
+ }
  ctx.restore();
 }
 function drawA1(){
@@ -673,7 +716,7 @@ function drawA1(){
 }
 function drawEntity(){
  if(!entity)return;
- if(entity.type==='A-25')drawA25();else drawA1();
+ if(entity.type==='A-25'||entity.type==='C-25')drawA25();else drawA1();
 }
 function drawPixelCanvasText(text,x,baseline,font,color,align){
  if(!a1LabelCanvas){
