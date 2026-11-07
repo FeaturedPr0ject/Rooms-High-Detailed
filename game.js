@@ -3,7 +3,7 @@ const canvas=document.getElementById('game');
 const ctx=canvas.getContext('2d');
 const W=960,H=540,HORIZON=220,FOCAL=430,CAMERA_HEIGHT=1.48,ROOM_LENGTH=32,CORRIDOR_HALF=4.2;
 const A1_DAMAGE_RADIUS=4,A1_DAMAGE_PER_TICK=10,A1_DAMAGE_INTERVAL=1,NEAR_CLIP=.48;
-const A25_ROOM=25,A25_SPEED=12,A25_DAMAGE_RADIUS=100,ROOMS_KEPT_BEHIND=2;
+const A25_ROOM=25,A25_SPEED=24,A25_DAMAGE_RADIUS=10,ROOMS_KEPT_BEHIND=2;
 const roomLabel=document.getElementById('room-label'),roomCtx=roomLabel.getContext('2d');
 const statusEl=document.getElementById('status'),healthWrap=document.getElementById('health-wrap'),healthFill=document.getElementById('health-fill');
 const overlay=document.getElementById('overlay'),overlayTitle=document.getElementById('overlay-title'),overlayCopy=document.getElementById('overlay-copy'),overlayEyebrow=document.getElementById('overlay-eyebrow'),resumeBtn=document.getElementById('resume'),muteBtn=document.getElementById('mute'),pauseBtn=document.getElementById('pause');
@@ -82,7 +82,7 @@ function hurt(amount=15){
 function startA25Encounter(targetRoom){
  a25Started=true;a25Completed=false;entityCooldown=0;
  const targetEnd=(targetRoom+1)*ROOM_LENGTH-.8;
- entity={type:'A-25',x:0,z:1.2,age:0,direction:1,targetRoom,targetZ:targetEnd,rebounds:0,particleTimer:0,particles:[],speed:A25_SPEED};
+ entity={type:'A-25',x:0,z:targetRoom*ROOM_LENGTH+ROOM_LENGTH*.5,age:0,direction:1,targetRoom,targetZ:targetEnd,rebounds:0,particleTimer:0,particles:[],speed:A25_SPEED};
  setStatus('A-25 ENTERED FROM THE LOBBY — HIDE IN A STEEL CABINET');
  sound(62,.8,'sawtooth',.035);
 }
@@ -90,7 +90,7 @@ function teleportToRoom(targetRoom){
  if(!Number.isInteger(targetRoom)||targetRoom<0||targetRoom>999){setStatus('INVALID ROOM NUMBER');return}
  room=targetRoom;player.x=0;player.z=room*ROOM_LENGTH+1.1;player.yaw=0;
  keys=Object.create(null);doorHint=false;isHiding=false;hidingCloset=null;hidingType=null;entityCooldown=0;
- if(room>=A25_ROOM&&!a25Started&&!a25Completed)startA25Encounter(room);
+ 
  updateHud();setStatus('TELEPORTED TO '+(room===0?'LOBBY':'ROOM A-'+String(room).padStart(3,'0')));
  adminPanel.style.display='none';adminPanel.setAttribute('aria-hidden','true');
 }
@@ -102,8 +102,8 @@ function spawnAdminEntity(){
   setStatus('ADMIN SPAWNED A-1');
   adminFeedback.textContent='A-1 SPAWNED IN FRONT OF PLAYER';
  }else if(selected==='A-25'){
-  const targetZ=(room+1)*ROOM_LENGTH-.8;
-  entity={type:'A-25',x:player.x,z:player.z+8,age:0,direction:1,targetRoom:room,targetZ,rebounds:0,particleTimer:0,particles:[],speed:A25_SPEED};
+  const spawnRoom=Math.max(1,room),targetZ=(spawnRoom+1)*ROOM_LENGTH-.8;
+  startA25Encounter(spawnRoom);
   setStatus('ADMIN SPAWNED A-25');
   adminFeedback.textContent='A-25 SPAWNED — HIDE IN A STEEL CABINET';
  }else{
@@ -119,7 +119,10 @@ function nextRoom(){
  if(doorZ-player.z>2.35){setStatus('DOOR IS TOO FAR');return}
  room++;player.z=doorZ+1.1;player.x=0;doorHint=false;
  sound(330,.08);setTimeout(()=>sound(220,.14),80);updateHud();setStatus('ROOM ENTERED');
- if(room>=A25_ROOM&&!a25Started&&!a25Completed){startA25Encounter(room);return}
+ if(!entity&&entityCooldown<=0&&Math.random()<.32){
+  startA25Encounter(room);
+  return;
+ }
  const spawnRate=getEntitySpawnRate('A-1');
  if(!entity&&entityCooldown<=0&&Math.random()<spawnRate){
   entity={type:'A-1',x:rand(-.22,.22),z:(room+1)*ROOM_LENGTH-1.4,age:0,phase:'stare',stareTime:rand(1.3,2.2),speed:ROOM_LENGTH*.58,damaged:false,damageTimer:0,cloneTimer:.08,clones:[]};
@@ -199,21 +202,24 @@ function update(dt){
    if(entity.direction>0&&entity.z>=entity.targetZ){
     entity.z=entity.targetZ;
     if(entity.rebounds===0){
-     entity.rebounds=1;entity.direction=-1;entity.targetZ=entity.targetRoom*ROOM_LENGTH+.8;
-     setStatus('A-25 REBOUNDS — KEEP HIDING');
+     entity.rebounds=1;entity.direction=-1;entity.targetZ=.8;
+     setStatus('A-25 REBOUNDS — RUNNING BACK TO THE LOBBY');
     }else if(entity.rebounds===2){
-     entity=null;a25Completed=true;setStatus('A-25 LEFT THE NEXT ROOM — SURVIVED');
+     entity=null;a25Completed=true;a25Started=false;setStatus('A-25 PASSED — ROOM CLEARED');
     }
    }else if(entity.direction<0&&entity.z<=entity.targetZ){
     entity.z=entity.targetZ;entity.rebounds=2;
-    entity.direction=1;entity.targetZ=(entity.targetRoom+1)*ROOM_LENGTH+2;
-    setStatus('A-25 REBOUNDS AGAIN — FINAL PASS');
+    entity.direction=1;entity.targetZ=(entity.targetRoom+1)*ROOM_LENGTH-.8;
+    setStatus('A-25 REBOUNDS AT THE LOBBY — FINAL PASS');
    }
-   if(entity&&!(isHiding&&hidingType==='closet')&&Math.hypot(entity.x-player.x,entity.z-player.z)<=A25_DAMAGE_RADIUS){
+   if(entity&&!isHiding&&Math.hypot(entity.x-player.x,entity.z-player.z)<=A25_DAMAGE_RADIUS){
     dead=true;running=false;health=0;updateHud();setStatus('LOST');
     showOverlay('A-25 FOUND YOU','Stay inside a steel cabinet for both passes.','TRY AGAIN','GAME OVER');return;
    }
-   if(entity&&Math.abs(entity.z-player.z)<=A25_DAMAGE_RADIUS&&!(isHiding&&hidingType==='closet'))setStatus('A-25 NEAR — HIDE NOW');
+   if(entity&&!isHiding){
+    const distance=Math.hypot(entity.x-player.x,entity.z-player.z);
+    if(distance<=A25_DAMAGE_RADIUS){shake=Math.max(shake,(1-distance/A25_DAMAGE_RADIUS)*17);setStatus('A-25 NEAR — HIDE NOW')}
+   }
   }else{
    entity.age+=dt;
    const auraDistance=Math.hypot(entity.x-player.x,entity.z-player.z);
@@ -510,7 +516,6 @@ function drawA1SpriteAt(worldX,worldZ,height,alpha,baseHeight=0,glow=true){
 }
 function drawA25Particle(particle){
  const sprite=a25ParticleSprites[particle.variant];
- if(!sprite||!sprite.complete||!sprite.naturalWidth)return;
  const point=project(particle.x,particle.z,particle.height);
  if(!point||point.forward>58||point.x<-100||point.x>W+100)return;
  const fade=clamp(1-particle.age/particle.life,0,1);
@@ -522,12 +527,14 @@ function drawA25Particle(particle){
  const glow=ctx.createRadialGradient(point.x,point.y,1,point.x,point.y,glowRadius);
  glow.addColorStop(0,'rgba(80,255,115,.52)');glow.addColorStop(1,'rgba(40,220,80,0)');
  ctx.fillStyle=glow;ctx.beginPath();ctx.arc(point.x,point.y,glowRadius,0,Math.PI*2);ctx.fill();ctx.restore();
- ctx.save();ctx.globalAlpha=fade*.78;ctx.drawImage(sprite,point.x-width/2,point.y-size/2,width,size);ctx.restore();
+ ctx.save();ctx.globalAlpha=fade*.78;
+ if(sprite&&sprite.complete&&sprite.naturalWidth)ctx.drawImage(sprite,point.x-width/2,point.y-size/2,width,size);
+ else{ctx.fillStyle='rgba(75,255,110,.9)';ctx.beginPath();ctx.arc(point.x,point.y,size*.34,0,Math.PI*2);ctx.fill()}
+ ctx.restore();
 }
 function drawA25(){
  if(!entity||entity.type!=='A-25')return;
  for(const particle of entity.particles)drawA25Particle(particle);
- if(!a25Sprite.complete||!a25Sprite.naturalWidth)return;
  const wobble=Math.sin(entity.age*34)*.13+Math.sin(entity.age*57)*.055;
  const drawX=entity.x+wobble;
  const baseSpace=cameraSpace(drawX,entity.z,0);
@@ -545,7 +552,9 @@ function drawA25(){
  glow.addColorStop(1,'rgba(30,210,65,0)');
  ctx.fillStyle=glow;ctx.beginPath();ctx.arc(base.x,centerY,radius,0,Math.PI*2);ctx.fill();ctx.restore();
  ctx.save();ctx.globalAlpha=.98;ctx.imageSmoothingEnabled=true;
- ctx.drawImage(a25Sprite,base.x-w/2,top.y,w,h);ctx.restore();
+ if(a25Sprite.complete&&a25Sprite.naturalWidth)ctx.drawImage(a25Sprite,base.x-w/2,top.y,w,h);
+ else{ctx.fillStyle='rgba(45,245,85,.68)';ctx.fillRect(base.x-w*.18,top.y+h*.12,w*.36,h*.82);ctx.beginPath();ctx.arc(base.x,top.y+h*.1,w*.19,0,Math.PI*2);ctx.fill()}
+ ctx.restore();
 }
 function drawA1(){
  if(!entity||entity.type!=='A-1')return;
