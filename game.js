@@ -125,7 +125,7 @@ function spawnAdminEntity(){
   setStatus('ADMIN SPAWNED '+selected);
   adminFeedback.textContent=selected+' SPAWNED FROM THE LOBBY';
  }else if(selected==='A-45'||selected==='C-45'){
-  const newestRoom=Math.max(1,room,furthestRoom);
+  const newestRoom=Math.max(0,room,furthestRoom);
   startA45Encounter(newestRoom,selected);
   setStatus('ADMIN SPAWNED '+selected);
   adminFeedback.textContent=selected+' SPAWNS IN THE LOBBY, THEN CHARGES TO THE LATEST DOOR';
