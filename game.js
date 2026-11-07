@@ -7,7 +7,7 @@ const A25_ROOM=25,A25_SPEED=12,A25_DAMAGE_RADIUS=100,ROOMS_KEPT_BEHIND=2;
 const roomLabel=document.getElementById('room-label'),roomCtx=roomLabel.getContext('2d');
 const statusEl=document.getElementById('status'),healthWrap=document.getElementById('health-wrap'),healthFill=document.getElementById('health-fill');
 const overlay=document.getElementById('overlay'),overlayTitle=document.getElementById('overlay-title'),overlayCopy=document.getElementById('overlay-copy'),overlayEyebrow=document.getElementById('overlay-eyebrow'),resumeBtn=document.getElementById('resume'),muteBtn=document.getElementById('mute'),pauseBtn=document.getElementById('pause');
-const adminToggle=document.getElementById('admin-toggle'),adminPanel=document.getElementById('admin-panel'),adminForm=document.getElementById('admin-form'),adminRoomInput=document.getElementById('admin-room'),adminClose=document.getElementById('admin-close');
+const adminToggle=document.getElementById('admin-toggle'),adminPanel=document.getElementById('admin-panel'),adminForm=document.getElementById('admin-form'),adminRoomInput=document.getElementById('admin-room'),adminClose=document.getElementById('admin-close'),adminEntitySelect=document.getElementById('admin-entity'),adminSpawnButton=document.getElementById('admin-spawn'),adminFeedback=document.getElementById('admin-feedback');
 let room=0,health=100,flashlight=true,running=true,paused=false,dead=false,mute=false,last=0,audio=null,shake=0;
 let keys=Object.create(null),entity=null,entityCooldown=0,doorHint=false,mouseTurn=0,isHiding=false,hidingCloset=null,hidingType=null;
 let a25Started=false,a25Completed=false;
@@ -45,7 +45,7 @@ function pixelizeElement(el){
  el.setAttribute('aria-label',text);el.replaceChildren(raster);
 }
 function installPixelText(){
- const targets=[statusEl,muteBtn,pauseBtn,...document.querySelectorAll('.controls span')];
+ const targets=[statusEl,muteBtn,pauseBtn,...document.querySelectorAll('.controls span'),...adminPanel.querySelectorAll('[data-pixel]')];
  for(const el of targets){
   pixelizeElement(el);
   const observer=new MutationObserver(()=>{if(el.children.length===1&&el.firstElementChild.classList.contains('pixel-text-canvas'))return;pixelizeElement(el)});
@@ -94,6 +94,26 @@ function teleportToRoom(targetRoom){
  updateHud();setStatus('TELEPORTED TO '+(room===0?'LOBBY':'ROOM A-'+String(room).padStart(3,'0')));
  adminPanel.style.display='none';adminPanel.setAttribute('aria-hidden','true');
 }
+function spawnAdminEntity(){
+ const selected=adminEntitySelect.value;
+ entityCooldown=0;
+ if(selected==='A-1'){
+  entity={type:'A-1',x:player.x,z:player.z+14,age:0,phase:'stare',stareTime:1.5,speed:ROOM_LENGTH*.58,damaged:false,damageTimer:0,cloneTimer:.08,clones:[]};
+  setStatus('ADMIN SPAWNED A-1');
+  adminFeedback.textContent='A-1 SPAWNED IN FRONT OF PLAYER';
+ }else if(selected==='A-25'){
+  const targetZ=(room+1)*ROOM_LENGTH-.8;
+  entity={type:'A-25',x:player.x,z:player.z+8,age:0,direction:1,targetRoom:room,targetZ,rebounds:0,particleTimer:0,particles:[],speed:A25_SPEED};
+  setStatus('ADMIN SPAWNED A-25');
+  adminFeedback.textContent='A-25 SPAWNED — HIDE IN A STEEL CABINET';
+ }else{
+  adminFeedback.textContent='UNKNOWN ENTITY';
+  return;
+ }
+ if(entity&&entity.type==='A-25')a25Started=true;
+ adminPanel.style.display='none';adminPanel.setAttribute('aria-hidden','true');
+ sound(selected==='A-25'?62:118,.35,'sawtooth',.028);
+}
 function nextRoom(){
  const doorZ=(room+1)*ROOM_LENGTH;
  if(doorZ-player.z>2.35){setStatus('DOOR IS TOO FAR');return}
@@ -107,7 +127,10 @@ function nextRoom(){
  }
 }
 function onKey(e,down){
- if(e.target&&e.target.closest&&e.target.closest('#admin-panel'))return;
+ if(e.target&&e.target.closest&&e.target.closest('#admin-panel')){
+  if(down&&e.key==='Escape'){adminPanel.style.display='none';adminPanel.setAttribute('aria-hidden','true');canvas.focus()}
+  return;
+ }
  const key=e.key.toLowerCase();
  if(key===' ')e.preventDefault();
  if(key==='e'){
@@ -128,7 +151,14 @@ pauseBtn.addEventListener('click',togglePause);
 muteBtn.addEventListener('click',()=>{mute=!mute;muteBtn.textContent=mute?'SOUND OFF':'SOUND ON';if(!mute)sound(300,.05)});
 adminToggle.addEventListener('click',()=>{const open=adminPanel.style.display!=='block';adminPanel.style.display=open?'block':'none';adminPanel.setAttribute('aria-hidden',String(!open));if(open){adminRoomInput.value=String(room);adminRoomInput.focus();adminRoomInput.select()}});
 adminClose.addEventListener('click',()=>{adminPanel.style.display='none';adminPanel.setAttribute('aria-hidden','true')});
-adminForm.addEventListener('submit',event=>{event.preventDefault();teleportToRoom(Number(adminRoomInput.value))});
+adminForm.addEventListener('submit',event=>{
+ event.preventDefault();
+ if(!adminRoomInput.value.trim()||!adminRoomInput.reportValidity())return;
+ const value=Number(adminRoomInput.value);
+ if(!Number.isInteger(value)||value<0||value>999){adminRoomInput.setCustomValidity('Enter a room from 0 to 999.');adminRoomInput.reportValidity();return}
+ adminRoomInput.setCustomValidity('');teleportToRoom(value);
+});
+adminSpawnButton.addEventListener('click',spawnAdminEntity);
 canvas.addEventListener('click',()=>{if(!paused&&!dead)canvas.focus()});
 canvas.addEventListener('contextmenu',e=>e.preventDefault());
 canvas.addEventListener('pointerdown',e=>{if(e.button!==2)return;rightDragging=true;lastPointerX=e.clientX;lastPointerY=e.clientY;canvas.setPointerCapture(e.pointerId);e.preventDefault()});
