@@ -383,6 +383,9 @@ function drawEndDoor(){
  const label=project(0,z-.1,2.44);
  if(label){ctx.save();ctx.fillStyle='#49351f';ctx.font='700 '+clamp(label.scale*.115,7,15)+'px Arial';ctx.textAlign='center';ctx.textBaseline='middle';ctx.shadowColor='#f5df9c';ctx.shadowBlur=.6;ctx.fillText('A-'+String(room+1).padStart(3,'0'),label.x,label.y);ctx.restore()}
 }
+const a1Sprite=new Image();
+a1Sprite.decoding='async';
+a1Sprite.src='./assets/a1.webp';
 function drawA1SpriteAt(worldX,worldZ,height,alpha,baseHeight=0,glow=true){
  if(!a1Sprite.complete||!a1Sprite.naturalWidth)return;
  const cameraPoint=cameraSpace(worldX,worldZ,baseHeight);
