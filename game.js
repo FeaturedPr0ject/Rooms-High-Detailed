@@ -93,7 +93,7 @@ function startA25Encounter(targetRoom,allowC25=true,forceC25=false){
  a25Started=true;a25Completed=false;entityCooldown=0;
  const isC25=forceC25||(allowC25&&Math.random()<C25_SPAWN_CHANCE);
  const type=isC25?'C-25':'A-25',targetEnd=(targetRoom+1)*ROOM_LENGTH-.8;
- entity={type,x:0,z:1.2,age:0,direction:1,targetRoom,targetZ:targetEnd,rebounds:0,particleTimer:0,particles:[],speed:isC25?C25_SPEED:A25_SPEED,reboundLimit:isC25?5:2};
+ entity={type,x:0,z:1.2,age:0,direction:1,targetRoom,targetZ:targetEnd,rebounds:0,particleTimer:0,particles:[],speed:isC25?C25_SPEED:A25_SPEED,reboundLimit:isC25?5.5:2};
  setStatus(type+' SPAWNED IN THE LOBBY — HIDE NOW');
  sound(isC25?92:62,.8,'sawtooth',.035);
 }
