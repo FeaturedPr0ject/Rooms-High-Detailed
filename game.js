@@ -3,7 +3,7 @@ const canvas=document.getElementById('game');
 const ctx=canvas.getContext('2d');
 const W=960,H=540,HORIZON=220,FOCAL=430,CAMERA_HEIGHT=1.48,ROOM_LENGTH=32,CORRIDOR_HALF=4.2;
 const A1_DAMAGE_RADIUS=4,A1_DAMAGE_PER_TICK=10,A1_DAMAGE_INTERVAL=1,NEAR_CLIP=.48;
-const A25_ROOM=25,A25_SPEED=24,C25_SPEED=40,A45_SPEED=64.4,C45_SPEED=114.8,A60_SPEED=103.32,A25_DAMAGE_RADIUS=10,A45_DAMAGE_RADIUS=8,C45_DAMAGE_RADIUS=8,C25_SPAWN_CHANCE=.012,ROOMS_KEPT_BEHIND=2;
+const A25_ROOM=25,A25_SPEED=24,C25_SPEED=40,A45_SPEED=64.4,C45_SPEED=114.8,A60_SPEED=103.32,A60_DAMAGE_RADIUS=11,A25_DAMAGE_RADIUS=10,A45_DAMAGE_RADIUS=8,C45_DAMAGE_RADIUS=8,C25_SPAWN_CHANCE=.012,ROOMS_KEPT_BEHIND=2;
 const roomLabel=document.getElementById('room-label'),roomCtx=roomLabel.getContext('2d');
 const statusEl=document.getElementById('status'),healthWrap=document.getElementById('health-wrap'),healthFill=document.getElementById('health-fill');
 const overlay=document.getElementById('overlay'),overlayTitle=document.getElementById('overlay-title'),overlayCopy=document.getElementById('overlay-copy'),overlayEyebrow=document.getElementById('overlay-eyebrow'),resumeBtn=document.getElementById('resume'),muteBtn=document.getElementById('mute'),pauseBtn=document.getElementById('pause');
@@ -106,6 +106,7 @@ function startA45Encounter(targetRoom,type){
 }
 function startA60Encounter(targetRoom){
  const targetCenter=targetRoom*ROOM_LENGTH+ROOM_LENGTH*.5;
+ a60FrameIndex=0;a60FrameTimer=0;
  entity={type:'A-60',x:0,z:1.2,age:0,phase:'charge',targetRoom,targetZ:targetCenter,speed:A60_SPEED,waitDuration:rand(4,6)};
  setStatus('A-60 IS CHARGING FROM THE LOBBY — HIDE NOW');
  sound(165,.7,'sawtooth',.045);
@@ -245,7 +246,7 @@ canvas.addEventListener('pointermove',e=>{if(!rightDragging)return;const dx=e.cl
 const stopRightDrag=()=>{rightDragging=false};
 canvas.addEventListener('pointerup',stopRightDrag);canvas.addEventListener('pointercancel',stopRightDrag);
 function update(dt){
- updateA60Animation();
+ updateA60Frames(dt);
  if(hideExitGrace>0)hideExitGrace=Math.max(0,hideExitGrace-dt);
  for(const state of doorStates.values())state.angle=Math.min(1.35,state.angle+dt*3.4);
  if(!isHiding){
@@ -348,6 +349,16 @@ function update(dt){
     if(entity.age>=1.25){
      entity=null;
      setStatus('A-60 DESPAWNED');
+    }
+   }
+   if(entity&&entity.phase==='charge'){
+    const distance=Math.hypot(entity.x-player.x,entity.z-player.z);
+    if(distance<=A60_DAMAGE_RADIUS){
+     shake=Math.max(shake,(1-distance/A60_DAMAGE_RADIUS)*52+3);
+     if(!isHiding&&!godMode){
+      dead=true;running=false;health=0;updateHud();setStatus('LOST');
+      showOverlay('A-60 FOUND YOU','Stay hidden until A-60 has passed.','TRY AGAIN','GAME OVER');return;
+     }
     }
    }
   }else if(entity){
@@ -718,55 +729,23 @@ a45Sprite.src='./assets/a45.webp';
 const c45Sprite=new Image();
 c45Sprite.decoding='async';
 c45Sprite.src='./assets/c45.webp';
-const a60Sprite=document.createElement('img');
-a60Sprite.decoding='async';
-a60Sprite.src='./assets/a60.gif';
-a60Sprite.alt='';
-a60Sprite.setAttribute('aria-hidden','true');
-a60Sprite.style.cssText='position:fixed;left:1px;top:1px;width:4px;height:4px;opacity:.01;pointer-events:none;z-index:2147483647;';
-document.body.appendChild(a60Sprite);
-const a60Animation={decoder:null,frame:null,frameIndex:0,frameCount:0,nextFrameAt:0,loading:false};
-async function decodeA60Frame(index){
- if(!a60Animation.decoder||a60Animation.loading)return;
- a60Animation.loading=true;
- try{
-  const result=await a60Animation.decoder.decode({frameIndex:index,completeFramesOnly:true});
-  const previous=a60Animation.frame;
-  a60Animation.frame=result.image;
-  a60Animation.frameIndex=index;
-  a60Animation.nextFrameAt=performance.now()+Math.max(20,(result.image.duration||100000)/1000);
-  if(previous&&previous!==result.image)previous.close();
- }catch(error){
-  a60Animation.frameIndex=0;
-  a60Animation.nextFrameAt=performance.now()+100;
-  console.warn('A-60 GIF frame decode failed',error);
- }finally{
-  a60Animation.loading=false;
+const a60Frames=Array.from({length:8},(_,index)=>{
+ const frame=new Image();
+ frame.decoding='async';
+ frame.src='./assets/A-60/'+(index+1)+'.webp';
+ return frame;
+});
+const A60_FRAME_DURATION=.075;
+let a60FrameIndex=0,a60FrameTimer=0;
+function updateA60Frames(dt){
+ if(!entity||entity.type!=='A-60')return;
+ a60FrameTimer+=dt;
+ if(a60FrameTimer>=A60_FRAME_DURATION){
+  const steps=Math.floor(a60FrameTimer/A60_FRAME_DURATION);
+  a60FrameIndex=(a60FrameIndex+steps)%a60Frames.length;
+  a60FrameTimer%=A60_FRAME_DURATION;
  }
 }
-async function loadA60Animation(){
- if(typeof ImageDecoder==='undefined')return;
- try{
-  const response=await fetch('./assets/a60.gif',{cache:'force-cache'});
-  if(!response.ok)throw new Error('A-60 GIF request failed: '+response.status);
-  const data=await response.arrayBuffer();
-  const decoder=new ImageDecoder({data,type:'image/gif'});
-  await decoder.tracks.ready;
-  const track=decoder.tracks.selectedTrack;
-  if(!track||track.frameCount<2)throw new Error('A-60 GIF has no animated frames');
-  a60Animation.decoder=decoder;
-  a60Animation.frameCount=track.frameCount;
-  await decodeA60Frame(0);
- }catch(error){
-  console.warn('A-60 animated decoder unavailable; using browser image fallback',error);
- }
-}
-function updateA60Animation(){
- if(!a60Animation.decoder||!a60Animation.frame||a60Animation.loading||performance.now()<a60Animation.nextFrameAt)return;
- const next=(a60Animation.frameIndex+1)%a60Animation.frameCount;
- decodeA60Frame(next);
-}
-loadA60Animation();
 function drawA1SpriteAt(worldX,worldZ,height,alpha,baseHeight=0,glow=true){
  if(!a1Sprite.complete||!a1Sprite.naturalWidth)return;
  const cameraPoint=cameraSpace(worldX,worldZ,baseHeight);
@@ -872,22 +851,53 @@ function drawA60(){
  if(cameraPoint.forward<1.35||cameraPoint.forward>58)return;
  const visualHeight=7.2;
  const base=project(entity.x,entity.z,0),top=project(entity.x,entity.z,visualHeight);
- if(!base||!top||base.x<-440||base.x>W+440)return;
+ if(!base||!top||base.x<-480||base.x>W+480)return;
  const h=clamp(Math.abs(base.y-top.y),2,900);
- const source=a60Animation.frame||a60Sprite;
- const sourceWidth=source.displayWidth||source.naturalWidth||1;
- const sourceHeight=source.displayHeight||source.naturalHeight||1;
- const aspect=sourceWidth/sourceHeight;
+ const frame=a60Frames[a60FrameIndex];
+ const aspect=frame&&frame.naturalWidth&&frame.naturalHeight?frame.naturalWidth/frame.naturalHeight:1;
  const w=clamp(h*aspect,2,1100);
  if(h<2||w<2||!Number.isFinite(h+w))return;
  const alpha=entity.phase==='fade'?clamp(1-entity.age/1.25,0,1):1;
+ const centerY=top.y+h*.5;
+ const auraRadius=clamp(Math.max(w,h)*.82,70,390);
+ ctx.save();
+ ctx.globalCompositeOperation='screen';
+ ctx.globalAlpha=alpha*.92;
+ const aura=ctx.createRadialGradient(base.x,centerY,2,base.x,centerY,auraRadius);
+ aura.addColorStop(0,'rgba(255,15,15,.76)');
+ aura.addColorStop(.28,'rgba(255,0,0,.44)');
+ aura.addColorStop(.66,'rgba(210,0,0,.18)');
+ aura.addColorStop(1,'rgba(120,0,0,0)');
+ ctx.fillStyle=aura;
+ ctx.beginPath();ctx.arc(base.x,centerY,auraRadius,0,Math.PI*2);ctx.fill();
+ const ringRadius=clamp(Math.max(w,h)*.43,54,300);
+ const rings=[
+  {scale:1,offsetX:-.08,offsetY:.02,rotation:-.34},
+  {scale:1.24,offsetX:.08,offsetY:-.03,rotation:.38}
+ ];
+ ctx.shadowColor='rgba(255,0,0,.98)';
+ ctx.shadowBlur=26;
+ for(let i=0;i<rings.length;i++){
+  const ring=rings[i],pulse=1+Math.sin(entity.age*3.4+i*1.8)*.035;
+  const rx=ringRadius*ring.scale*pulse;
+  ctx.globalAlpha=alpha*(i===0?.82:.66);
+  ctx.strokeStyle=i===0?'rgba(255,25,25,.96)':'rgba(255,75,55,.82)';
+  ctx.lineWidth=clamp(ringRadius*.065,5,19);
+  ctx.beginPath();
+  ctx.ellipse(base.x+ring.offsetX*ringRadius,centerY+ring.offsetY*ringRadius,rx,rx*.82,ring.rotation,0,Math.PI*2);
+  ctx.stroke();
+ }
+ ctx.restore();
  ctx.save();
  ctx.globalAlpha=alpha;
+ ctx.shadowColor='rgba(255,0,0,.95)';
+ ctx.shadowBlur=30;
  ctx.imageSmoothingEnabled=true;
- if(a60Animation.frame||a60Sprite.complete&&a60Sprite.naturalWidth)ctx.drawImage(source,base.x-w/2,top.y,w,h);
- else{
-  ctx.fillStyle='rgba(245,245,245,.75)';
-  ctx.beginPath();ctx.ellipse(base.x,top.y+h*.5,w*.28,h*.46,0,0,Math.PI*2);ctx.fill();
+ if(frame&&frame.complete&&frame.naturalWidth){
+  ctx.drawImage(frame,base.x-w/2,top.y,w,h);
+ }else{
+  ctx.fillStyle='rgba(255,0,0,.82)';
+  ctx.beginPath();ctx.ellipse(base.x,centerY,w*.28,h*.46,0,0,Math.PI*2);ctx.fill();
  }
  ctx.restore();
 }
