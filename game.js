@@ -107,7 +107,7 @@ function startA45Encounter(targetRoom,type){
 function startA60Encounter(targetRoom){
  const targetCenter=targetRoom*ROOM_LENGTH+ROOM_LENGTH*.5;
  a60FrameIndex=0;a60FrameTimer=0;a60FrameTrail=[];a60CurrentOffset={x:rand(-.5,.5),y:rand(-.5,.5)};
- entity={type:'A-60',x:0,z:1.2,age:0,phase:'charge',targetRoom,targetZ:targetCenter,speed:A60_SPEED,waitDuration:rand(4,6),ringTime:0,dustTimer:0,trailTimer:0,dustParticles:[],dustTrail:[]};
+ entity={type:'A-60',x:0,z:1.2,age:0,phase:'charge',targetRoom,targetZ:targetCenter,speed:A60_SPEED,waitDuration:rand(4,6),ringTime:0,ringTrailTimer:0,ringTrail:[],dustTimer:0,trailTimer:0,dustParticles:[],dustTrail:[]};
  setStatus('A-60 IS CHARGING FROM THE LOBBY — HIDE NOW');
  sound(165,.7,'sawtooth',.045);
 }
@@ -334,12 +334,20 @@ function update(dt){
    const previousZ=entity.z,previousX=entity.x;
    entity.dustTimer-=dt;
    entity.trailTimer-=dt;
+   entity.ringTrailTimer-=dt;
+   for(const ring of entity.ringTrail)ring.age+=dt;
+   entity.ringTrail=entity.ringTrail.filter(ring=>ring.age<ring.life);
    if(entity.phase==='charge'){
     entity.z=Math.min(entity.targetZ,entity.z+entity.speed*dt);
     if(entity.trailTimer<=0){
      entity.dustTrail.push({x:entity.x+rand(-.18,.18),z:entity.z+rand(.1,.65),age:0,life:rand(.48,.82),size:rand(3.2,5.4)});
      if(entity.dustTrail.length>24)entity.dustTrail.shift();
      entity.trailTimer=.045;
+    }
+    if(entity.ringTrailTimer<=0&&entity.z>previousZ){
+     entity.ringTrail.push({x:entity.x,z:previousZ,angle:-entity.ringTime*10.5,age:0,life:1.1});
+     if(entity.ringTrail.length>7)entity.ringTrail.shift();
+     entity.ringTrailTimer=.12;
     }
     if(entity.z>=entity.targetZ){
      entity.phase='wait';
@@ -936,20 +944,14 @@ function drawA60(){
  ctx.beginPath();ctx.ellipse(base.x,base.y+9,floorRadius,Math.max(14,floorRadius*.2),0,0,Math.PI*2);ctx.fill();
  ctx.restore();
 
- const trailStart=Math.max(0,entity.dustTrail.length-20);
- for(let i=trailStart;i<entity.dustTrail.length;i++){
+ const dustTrailStart=Math.max(0,entity.dustTrail.length-20);
+ for(let i=dustTrailStart;i<entity.dustTrail.length;i++){
   const trail=entity.dustTrail[i],point=project(trail.x,trail.z,.22);
   if(!point)continue;
-  const fade=clamp(1-trail.age/trail.life,0,1);
-  const radius=clamp(point.scale*trail.size,7,300);
-  ctx.save();
-  ctx.globalCompositeOperation='source-over';
-  ctx.globalAlpha=alpha*fade*.24;
-  ctx.fillStyle='#690000';
-  ctx.shadowColor='#710000';
-  ctx.shadowBlur=radius*.42;
-  ctx.beginPath();ctx.ellipse(point.x,point.y,radius,radius*.26,-.08,0,Math.PI*2);ctx.fill();
-  ctx.restore();
+  const fade=clamp(1-trail.age/trail.life,0,1),radius=clamp(point.scale*trail.size,7,300);
+  ctx.save();ctx.globalCompositeOperation='source-over';ctx.globalAlpha=alpha*fade*.24;
+  ctx.fillStyle='#690000';ctx.shadowColor='#710000';ctx.shadowBlur=radius*.42;
+  ctx.beginPath();ctx.ellipse(point.x,point.y,radius,radius*.26,-.08,0,Math.PI*2);ctx.fill();ctx.restore();
  }
 
  const bodyCloud=ctx.createRadialGradient(base.x,centerY,2,base.x,centerY,Math.max(w,h)*.72);
@@ -957,29 +959,38 @@ function drawA60(){
  bodyCloud.addColorStop(.48,'rgba(66,0,0,.64)');
  bodyCloud.addColorStop(.82,'rgba(40,0,0,.32)');
  bodyCloud.addColorStop(1,'rgba(20,0,0,0)');
- ctx.save();
- ctx.globalCompositeOperation='multiply';
- ctx.globalAlpha=alpha;
- ctx.fillStyle=bodyCloud;
- ctx.beginPath();ctx.ellipse(base.x,centerY,w*.72,h*.58,0,0,Math.PI*2);ctx.fill();
- ctx.restore();
+ ctx.save();ctx.globalCompositeOperation='multiply';ctx.globalAlpha=alpha;ctx.fillStyle=bodyCloud;
+ ctx.beginPath();ctx.ellipse(base.x,centerY,w*.72,h*.58,0,0,Math.PI*2);ctx.fill();ctx.restore();
 
- const horizontalAngle=entity.ringTime*10.5,horizontalPoints=[];
- for(let i=0;i<=64;i++){
-  const t=i/64*Math.PI*2,localX=Math.cos(t)*3.1,localZ=Math.sin(t)*3.7;
-  const x=localX*Math.cos(horizontalAngle)-localZ*Math.sin(horizontalAngle);
-  const z=localX*Math.sin(horizontalAngle)+localZ*Math.cos(horizontalAngle);
-  horizontalPoints.push({x:entity.x+x,z:entity.z+z,height:.08});
+ for(const particle of entity.dustParticles){
+  const point=project(particle.x,particle.z,particle.height);
+  if(!point||point.forward>58||point.x<-500||point.x>W+500)continue;
+  const fade=clamp(1-particle.age/particle.life,0,1);
+  drawA60DustCloud(point,particle.size,alpha*fade*.82);
  }
- const verticalAngle=-entity.ringTime*13.2,verticalPoints=[];
- for(let i=0;i<=64;i++){
-  const t=i/64*Math.PI*2,r=2.65;
-  verticalPoints.push({x:entity.x+Math.cos(t)*r*Math.cos(verticalAngle),z:entity.z+Math.cos(t)*r*Math.sin(verticalAngle),height:2.45+Math.sin(t)*r});
+
+ const drawVerticalRing=(ringX,ringZ,angle,radius,color,width,ringAlpha)=>{
+  const points=[],centerHeight=visualHeight*.5;
+  for(let i=0;i<=72;i++){
+   const t=i/72*Math.PI*2;
+   points.push({
+    x:ringX+Math.cos(t)*radius*Math.cos(angle),
+    z:ringZ+Math.cos(t)*radius*Math.sin(angle),
+    height:centerHeight+Math.sin(t)*radius
+   });
+  }
+  ctx.save();ctx.globalAlpha=alpha*ringAlpha;ctx.globalCompositeOperation='source-over';
+  drawA60WorldRing(points,color,width);
+  ctx.restore();
+ };
+
+ for(const trailRing of entity.ringTrail){
+  const progress=clamp(trailRing.age/trailRing.life,0,1);
+  const radius=2.35*(1-progress*.48);
+  drawVerticalRing(trailRing.x,trailRing.z,trailRing.angle,radius,'#760000',clamp(125/cameraPoint.forward,2,8),.3*(1-progress));
  }
- ctx.save();ctx.globalAlpha=alpha;ctx.globalCompositeOperation='source-over';
- drawA60WorldRing(horizontalPoints,'#760000',clamp(120/cameraPoint.forward,2,8));
- drawA60WorldRing(verticalPoints,'#a00000',clamp(150/cameraPoint.forward,2,9));
- ctx.restore();
+ const mainRingAngle=-entity.ringTime*10.5;
+ drawVerticalRing(entity.x,entity.z,mainRingAngle,2.35,'#a00000',clamp(165/cameraPoint.forward,3,10),1);
 
  const drawFrame=(frameIndex,offsetX,offsetY,frameAlpha)=>{
   const image=a60Frames[frameIndex];
@@ -1001,13 +1012,6 @@ function drawA60(){
   drawFrame(trail.index,trail.x,trail.y,trailAlphas[i]||.18);
  }
  drawFrame(a60FrameIndex,a60CurrentOffset.x,a60CurrentOffset.y,1);
-
- for(const particle of entity.dustParticles){
-  const point=project(particle.x,particle.z,particle.height);
-  if(!point||point.forward>58||point.x<-500||point.x>W+500)continue;
-  const fade=clamp(1-particle.age/particle.life,0,1);
-  drawA60DustCloud(point,particle.size,alpha*fade*.82);
- }
 }
 function drawA1(){
  if(!entity||entity.type!=='A-1')return;
