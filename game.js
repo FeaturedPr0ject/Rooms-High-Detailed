@@ -6,9 +6,9 @@ const A1_DAMAGE_RADIUS=4,A1_DAMAGE_PER_TICK=10,A1_DAMAGE_INTERVAL=1,NEAR_CLIP=.4
 const A25_ROOM=25,A25_SPEED=24,C25_SPEED=40,A45_SPEED=64.4,C45_SPEED=114.8,A60_SPEED=103.32,A60_DAMAGE_RADIUS=11,A25_DAMAGE_RADIUS=10,A45_DAMAGE_RADIUS=8,C45_DAMAGE_RADIUS=8,C25_SPAWN_CHANCE=.012,ROOMS_KEPT_BEHIND=2;
 const roomLabel=document.getElementById('room-label'),roomCtx=roomLabel.getContext('2d');
 const statusEl=document.getElementById('status'),healthWrap=document.getElementById('health-wrap'),healthFill=document.getElementById('health-fill');
-const overlay=document.getElementById('overlay'),overlayTitle=document.getElementById('overlay-title'),overlayCopy=document.getElementById('overlay-copy'),overlayEyebrow=document.getElementById('overlay-eyebrow'),resumeBtn=document.getElementById('resume'),muteBtn=document.getElementById('mute'),pauseBtn=document.getElementById('pause');
+const overlay=document.getElementById('overlay'),overlayTitle=document.getElementById('overlay-title'),overlayCopy=document.getElementById('overlay-copy'),overlayEyebrow=document.getElementById('overlay-eyebrow'),resumeBtn=document.getElementById('resume'),muteBtn=document.getElementById('mute'),pauseBtn=document.getElementById('pause'),hud=document.querySelector('.hud');
 const adminToggle=document.getElementById('admin-toggle'),adminPanel=document.getElementById('admin-panel'),adminForm=document.getElementById('admin-form'),adminRoomInput=document.getElementById('admin-room'),adminClose=document.getElementById('admin-close'),adminEntitySelect=document.getElementById('admin-entity'),adminSpawnButton=document.getElementById('admin-spawn'),adminFeedback=document.getElementById('admin-feedback'),adminGodMode=document.getElementById('admin-god-mode');
-let room=0,furthestRoom=0,health=100,flashlight=true,running=true,paused=false,dead=false,mute=false,last=0,audio=null,shake=0;
+let room=0,furthestRoom=0,health=100,flashlight=true,running=true,paused=false,dead=false,mute=false,last=0,audio=null,shake=0,jumpscare=null;
 let keys=Object.create(null),entity=null,entityCooldown=0,doorHint=false,mouseTurn=0,isHiding=false,hidingCloset=null,hidingType=null;
 const entities=[];
 let nextEntityId=1;
@@ -101,8 +101,21 @@ function showOverlay(title,copy,button,eyebrow){
  for(const el of [overlayTitle,overlayCopy,resumeBtn,overlayEyebrow])if(!el.querySelector('.pixel-text-canvas'))pixelizeElement(el);
 }
 function hideOverlay(){overlay.style.display='none'}
+function startA25Jumpscare(){
+ clearMovementKeys();
+ dead=true;running=true;paused=false;health=0;
+ jumpscare={age:0,duration:1.35};
+ hud.style.visibility='hidden';
+ adminPanel.style.display='none';
+ adminPanel.setAttribute('aria-hidden','true');
+ hideOverlay();
+ setStatus('A-25 FOUND YOU');
+ updateHud();
+ shake=18;
+ sound(48,.95,'sawtooth',.075);
+}
 function startNewRun(){
- clearMovementKeys();hideExitGrace=0;
+ clearMovementKeys();hideExitGrace=0;jumpscare=null;hud.style.visibility='visible';
  room=0;furthestRoom=0;doorStates.clear();health=100;player.x=0;player.z=5;player.yaw=0;viewPitch=0;entities.length=0;entity=null;nextEntityId=1;entityCooldown=0;a25Started=false;a25Completed=false;isHiding=false;hidingCloset=null;hidingType=null;dead=false;paused=false;running=true;keys=Object.create(null);
  updateHud();setStatus('LOBBY');hideOverlay();last=performance.now();sound(250,.12);requestAnimationFrame(loop);
 }
@@ -479,6 +492,7 @@ function update(dt){
      }
     }
     if(entity&&!isHiding&&!godMode&&hideExitGrace<=0&&Math.hypot(entity.x-player.x,entity.z-player.z)<=A25_DAMAGE_RADIUS){
+     if(entity.type==='A-25'){startA25Jumpscare();return}
      dead=true;running=false;health=0;updateHud();setStatus('LOST');
      showOverlay(entity.type+' FOUND YOU','Stay hidden until the entity has passed.','TRY AGAIN','GAME OVER');return;
     }
@@ -1246,6 +1260,53 @@ function drawPixelCanvasText(text,x,baseline,font,color,align){
  const left=align==='center'?x-width/2:x;
  ctx.save();ctx.imageSmoothingEnabled=false;ctx.drawImage(temp,left,baseline-size*1.25,width,height);ctx.restore();
 }
+function drawA25Jumpscare(){
+ if(!jumpscare)return;
+ const progress=clamp(jumpscare.age/jumpscare.duration,0,1);
+ const eased=1-Math.pow(1-progress,2.4);
+ const pulse=.5+.5*Math.sin(jumpscare.age*48);
+ ctx.save();
+ ctx.fillStyle='#020a03';ctx.fillRect(0,0,W,H);
+ ctx.globalCompositeOperation='screen';
+ ctx.globalAlpha=.3+pulse*.18;
+ const aura=ctx.createRadialGradient(W*.5,H*.48,8,W*.5,H*.48,Math.max(W,H)*.78);
+ aura.addColorStop(0,'rgba(35,255,70,.8)');
+ aura.addColorStop(.38,'rgba(20,170,45,.55)');
+ aura.addColorStop(1,'rgba(0,35,8,0)');
+ ctx.fillStyle=aura;ctx.fillRect(0,0,W,H);
+ ctx.globalCompositeOperation='source-over';
+ if(a25Sprite.complete&&a25Sprite.naturalWidth&&a25Sprite.naturalHeight){
+  const fit=Math.max(W/a25Sprite.naturalWidth,H/a25Sprite.naturalHeight);
+  const scale=fit*(.92+eased*1.55);
+  const width=a25Sprite.naturalWidth*scale,height=a25Sprite.naturalHeight*scale;
+  const shakeX=Math.sin(jumpscare.age*71)*(.025+progress*.035)*W;
+  const shakeY=Math.cos(jumpscare.age*83)*(.02+progress*.025)*H;
+  ctx.save();
+  ctx.translate(W*.5+shakeX,H*.5+shakeY);
+  ctx.globalAlpha=.9+pulse*.1;
+  ctx.shadowColor='#39ff55';
+  ctx.shadowBlur=24+pulse*44;
+  ctx.imageSmoothingEnabled=true;
+  ctx.drawImage(a25Sprite,-width*.5,-height*.5,width,height);
+  ctx.restore();
+ }else{
+  ctx.fillStyle='#35f05a';ctx.font='900 72px Arial';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText('A-25',W/2,H/2);
+ }
+ ctx.globalCompositeOperation='screen';
+ ctx.globalAlpha=.12+pulse*.14;
+ ctx.fillStyle='#37ff52';ctx.fillRect(0,0,W,H);
+ ctx.globalCompositeOperation='source-over';
+ const edge=ctx.createRadialGradient(W/2,H/2,Math.min(W,H)*.12,W/2,H/2,Math.max(W,H)*.72);
+ edge.addColorStop(0,'rgba(0,0,0,0)');
+ edge.addColorStop(.68,'rgba(0,0,0,.08)');
+ edge.addColorStop(1,'rgba(0,0,0,.8)');
+ ctx.fillStyle=edge;ctx.fillRect(0,0,W,H);
+ if(progress>.84){
+  ctx.globalAlpha=(progress-.84)/.16*.72;
+  ctx.fillStyle='#020602';ctx.fillRect(0,0,W,H);
+ }
+ ctx.restore();
+}
 function draw(){
  ctx.save();
  if(shake>0){ctx.translate(rand(-shake,shake),rand(-shake,shake));shake*=.84}
@@ -1260,10 +1321,23 @@ function draw(){
  darkness.addColorStop(0,'rgba(0,0,0,0)');darkness.addColorStop(.62,'rgba(0,0,0,.18)');darkness.addColorStop(1,flashlight?'rgba(0,0,0,.68)':'rgba(0,0,0,.94)');
  ctx.fillStyle=darkness;ctx.fillRect(0,0,W,H);ctx.restore();
  if(entities.some(item=>item.type==='A-1'&&item.phase==='stare'))drawPixelCanvasText('A-1',W/2,H-55,'700 13px Arial,Helvetica,sans-serif','#c2b88d','center');
+ if(jumpscare)drawA25Jumpscare();
 }
 function loop(t){
- if(!running||paused||dead)return;
- const dt=Math.min((t-last)/1000,.04);last=t;update(dt);draw();requestAnimationFrame(loop);
+ if(!running||paused||(dead&&!jumpscare))return;
+ const dt=Math.min((t-last)/1000,.04);last=t;
+ if(jumpscare){
+  jumpscare.age=Math.min(jumpscare.duration,jumpscare.age+dt);
+  draw();
+  if(jumpscare.age>=jumpscare.duration){
+   jumpscare=null;running=false;
+   showOverlay('A-25 FOUND YOU','Your run ended in room A-'+String(room).padStart(3,'0')+'.','TRY AGAIN','GAME OVER');
+   return;
+  }
+  requestAnimationFrame(loop);
+  return;
+ }
+ update(dt);draw();requestAnimationFrame(loop);
 }
 installPixelText();updateHud();setStatus('');last=performance.now();requestAnimationFrame(loop);
 })();
