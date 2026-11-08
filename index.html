@@ -5,53 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <meta name="theme-color" content="#080909">
 <title>ROOMS — Low Detailed</title>
-<style>
-:root{color-scheme:dark;--gold:#c2b88d}
-*{box-sizing:border-box}
-html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#000;color:var(--gold);font:14px/1.45 "Segoe UI",Arial,Helvetica,sans-serif;-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
-body{padding:0;min-width:100%;min-height:100%;overscroll-behavior:none}.shell{position:fixed;inset:0;width:100vw;width:100dvw;height:100vh;height:100dvh;min-height:100svh;background:#050706;overflow:hidden}.gameframe{position:absolute;inset:0;width:100%;height:100%;overflow:hidden}#game{position:absolute;inset:0;display:block;width:100%;height:100%;min-width:100%;min-height:100%;object-fit:fill;image-rendering:auto}
-.hud{position:absolute;inset:0;pointer-events:none;color:var(--gold);text-shadow:0 1px 4px #000}
-.room-label{position:absolute;top:18px;left:22px;width:180px;height:27px;image-rendering:pixelated;image-rendering:crisp-edges}
-.health-wrap{display:none;position:absolute;right:22px;top:22px;width:190px}
-.health-track{height:12px;background:#252b28;border:1px solid #ffffff55;border-radius:999px;overflow:hidden;box-shadow:0 1px 5px #0009}
-.health-fill{height:100%;width:100%;border-radius:999px;background:linear-gradient(#71e36b,#279c38);transition:width .18s ease,background .18s ease}
-.status{position:absolute;top:20px;left:50%;transform:translateX(-50%);font-size:11px;letter-spacing:.12em;white-space:nowrap}
-.actions{position:absolute;right:18px;top:54px;display:flex;gap:7px;pointer-events:auto}
-.btn{padding:6px 10px;font:inherit;font-size:10px;letter-spacing:.1em;color:var(--gold);background:#17150dcc;border:1px solid #8c805e88;border-radius:4px;cursor:pointer;text-shadow:0 1px 3px #000}
-.btn:hover{background:#34301e}
-.admin-panel{display:none;position:absolute;z-index:6;right:18px;top:94px;width:min(310px,calc(100vw - 24px));max-height:calc(100dvh - 125px);overflow:auto;padding:15px;background:rgba(9,13,12,.96);border:1px solid #8c805e99;box-shadow:0 12px 34px #000b;color:var(--gold);pointer-events:auto;backdrop-filter:blur(8px)}
-.admin-panel form{display:grid;gap:12px}
-.admin-heading{font:700 12px/1.3 "Courier New",monospace;letter-spacing:.2em;color:#e0d3a1;padding-bottom:10px;border-bottom:1px solid #7b704d88}
-.admin-section{display:grid;gap:8px}
-.admin-section label{font:700 10px/1.35 "Courier New",monospace;letter-spacing:.14em;color:#cfc49a}
-.admin-row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:7px}
-.admin-panel input,.admin-panel select{width:100%;min-width:0;padding:9px 10px;background:#050807;border:1px solid #71694e;color:var(--gold);font:12px/1.35 "Courier New",monospace;letter-spacing:.04em;outline:none;box-shadow:inset 0 1px 4px #0009}
-.admin-panel input:focus,.admin-panel select:focus{border-color:#c2b88d;box-shadow:0 0 0 1px #c2b88d33}
-.admin-panel select{appearance:auto;cursor:pointer}
-.admin-panel-actions{display:flex;gap:8px}
-.admin-switch{display:flex!important;align-items:center;gap:10px;cursor:pointer;min-height:28px}
-.admin-switch input{position:absolute!important;width:1px!important;height:1px!important;opacity:0!important;pointer-events:none}
-.admin-switch-track{position:relative;flex:0 0 36px;width:36px;height:20px;border:1px solid #71694e;border-radius:12px;background:#242a27;transition:background .16s,border-color .16s}
-.admin-switch-track:after{content:"";position:absolute;left:2px;top:2px;width:14px;height:14px;border-radius:50%;background:#a9a18a;transition:transform .16s,background .16s}
-.admin-switch input:checked+.admin-switch-track{background:#315b37;border-color:#76c47a}
-.admin-switch input:checked+.admin-switch-track:after{transform:translateX(16px);background:#a0f0a2}
-.admin-switch input:focus-visible+.admin-switch-track{outline:2px solid #c2b88d;outline-offset:2px}
-.admin-panel .btn{font-family:"Courier New",monospace;font-size:10px;letter-spacing:.08em;min-height:34px}
-.admin-panel .btn:hover{border-color:#c2b88d;background:#34301e}
-.admin-note{font:10px/1.45 "Courier New",monospace;letter-spacing:.025em;opacity:.68}
-.admin-divider{height:1px;background:#7b704d66;margin:1px 0}
-.admin-feedback{min-height:14px;color:#a8c99c;font:10px/1.35 "Courier New",monospace;letter-spacing:.04em;opacity:.9}
-.admin-panel .pixel-text-canvas{image-rendering:pixelated;image-rendering:crisp-edges;vertical-align:middle;max-width:100%}
-.touch-controls{display:none;position:absolute;z-index:4;left:12px;bottom:18px;right:12px;pointer-events:none;align-items:flex-end;justify-content:space-between;touch-action:none}.touch-pad{display:grid;grid-template-columns:repeat(3,48px);grid-template-rows:repeat(2,48px);gap:5px;pointer-events:auto}.touch-actions{display:flex;align-items:flex-end;gap:9px;pointer-events:auto}.touch-btn{width:48px;height:48px;border:1px solid #c2b88d88;border-radius:12px;background:#111a17cc;color:#e5d8a5;font:700 15px/1 Arial,sans-serif;touch-action:none;user-select:none;-webkit-user-select:none;box-shadow:0 3px 12px #0008}.touch-btn:active,.touch-btn.pressed{background:#536b50cc;border-color:#b8e6a0}.touch-btn.action{width:58px;height:58px;border-radius:50%;font-size:17px}.touch-btn.run{width:48px;height:48px;font-size:11px}.touch-empty{visibility:hidden}@media(max-width:700px),(pointer:coarse){.touch-controls{display:flex;bottom:max(18px,env(safe-area-inset-bottom))}.controls{display:none}.gameframe canvas{touch-action:none}}
-.controls{position:absolute;left:50%;bottom:13px;transform:translateX(-50%);display:flex;gap:15px;white-space:nowrap;font-size:9px;letter-spacing:.05em;color:var(--gold);text-shadow:0 1px 4px #000;opacity:.72}
-.overlay{position:absolute;inset:0;z-index:5;display:none;place-items:center;background:#030505d9;padding:20px;text-align:center}
-.dialog{width:min(440px,100%);padding:28px;background:#0d1210ed;border:1px solid #665d43;box-shadow:0 15px 60px #000}
-.dialog h1{font-size:clamp(30px,6vw,48px);line-height:1;margin:10px 0;color:var(--gold);letter-spacing:.08em}
-.dialog p{color:var(--gold);font-size:12px;max-width:340px;margin:12px auto 20px}
-.eyebrow{color:var(--gold);letter-spacing:.25em;font-size:10px}
-.pixel-text-canvas{display:inline-block;image-rendering:pixelated;image-rendering:crisp-edges;vertical-align:middle;max-width:100%}
-@media(max-width:700px){.room-label{top:12px;left:12px}.health-wrap{right:12px;top:48px;width:145px}.actions{right:10px;top:10px}.status{top:55px}.controls{font-size:8px;gap:7px;bottom:8px;white-space:normal;text-align:center;width:94%;justify-content:center;flex-wrap:wrap}.admin-panel{right:10px;top:55px;max-height:calc(100dvh - 70px);width:min(310px,calc(100vw - 20px))}}
-</style>
+<link rel="stylesheet" href="./style.css">
 </head>
 <body>
 <main class="shell">
