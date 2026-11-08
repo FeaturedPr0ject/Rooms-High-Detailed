@@ -107,7 +107,7 @@ function startA45Encounter(targetRoom,type){
 function startA60Encounter(targetRoom){
  const targetCenter=targetRoom*ROOM_LENGTH+ROOM_LENGTH*.5;
  a60FrameIndex=0;a60FrameTimer=0;a60FrameTrail=[];a60CurrentOffset={x:rand(-.5,.5),y:rand(-.5,.5)};
- entity={type:'A-60',x:0,z:1.2,age:0,phase:'charge',targetRoom,targetZ:targetCenter,speed:A60_SPEED,waitDuration:rand(4,6),ringTime:0,beamTimer:0,beams:[]};
+ entity={type:'A-60',x:0,z:1.2,age:0,phase:'charge',targetRoom,targetZ:targetCenter,speed:A60_SPEED,waitDuration:rand(4,6),ringTime:0,dustTimer:0,trailTimer:0,dustParticles:[],dustTrail:[]};
  setStatus('A-60 IS CHARGING FROM THE LOBBY — HIDE NOW');
  sound(165,.7,'sawtooth',.045);
 }
@@ -331,21 +331,16 @@ function update(dt){
    }
   }}else if(entity&&entity.type==='A-60'){
    entity.ringTime+=dt;
-   for(const beam of entity.beams)beam.age+=dt;
-   entity.beams=entity.beams.filter(beam=>beam.age<beam.life);
-   if(entity.phase!=='fade'){
-    entity.beamTimer-=dt;
-    if(entity.beamTimer<=0){
-     for(let i=0;i<2;i++){
-      const angle=rand(0,Math.PI*2),length=rand(1.8,4.2);
-      entity.beams.push({x:entity.x+rand(-.45,.45),z:entity.z+rand(-.45,.45),height:rand(.45,4.5),dx:Math.cos(angle)*length,dz:Math.sin(angle)*length,dy:rand(-1.1,1.1),age:0,life:rand(.16,.3)});
-     }
-     if(entity.beams.length>28)entity.beams.splice(0,entity.beams.length-28);
-     entity.beamTimer=.065;
-    }
-   }
+   const previousZ=entity.z,previousX=entity.x;
+   entity.dustTimer-=dt;
+   entity.trailTimer-=dt;
    if(entity.phase==='charge'){
     entity.z=Math.min(entity.targetZ,entity.z+entity.speed*dt);
+    if(entity.trailTimer<=0){
+     entity.dustTrail.push({x:entity.x+rand(-.18,.18),z:entity.z+rand(.1,.65),age:0,life:rand(.48,.82),size:rand(3.2,5.4)});
+     if(entity.dustTrail.length>24)entity.dustTrail.shift();
+     entity.trailTimer=.045;
+    }
     if(entity.z>=entity.targetZ){
      entity.phase='wait';
      entity.age=0;
@@ -353,11 +348,6 @@ function update(dt){
     }
    }else if(entity.phase==='wait'){
     entity.age+=dt;
-    if(entity.age>=entity.waitDuration){
-     entity.phase='fade';
-     entity.age=0;
-     setStatus('A-60 IS FADING OUT');
-    }
    }else if(entity.phase==='fade'){
     entity.age+=dt;
     if(entity.age>=1.25){
@@ -366,13 +356,42 @@ function update(dt){
      setStatus('A-60 DESPAWNED');
     }
    }
-   if(entity&&entity.phase==='charge'){
-    const distance=Math.hypot(entity.x-player.x,entity.z-player.z);
-    if(distance<=A60_DAMAGE_RADIUS){
-     shake=Math.max(shake,(1-distance/A60_DAMAGE_RADIUS)*52+3);
-     if(!isHiding&&!godMode){
-      dead=true;running=false;health=0;updateHud();setStatus('LOST');
-      showOverlay('A-60 FOUND YOU','Stay hidden until A-60 has passed.','TRY AGAIN','GAME OVER');return;
+   if(entity){
+    const movedZ=entity.z-previousZ,movedX=entity.x-previousX;
+    for(const particle of entity.dustParticles){
+     particle.age+=dt;
+     particle.x+=movedX+particle.vx*dt;
+     particle.z+=movedZ+particle.vz*dt;
+     particle.height+=particle.vh*dt;
+    }
+    entity.dustParticles=entity.dustParticles.filter(particle=>particle.age<particle.life);
+    for(const trail of entity.dustTrail)trail.age+=dt;
+    entity.dustTrail=entity.dustTrail.filter(trail=>trail.age<trail.life);
+    if(entity.phase!=='fade'&&entity.dustTimer<=0){
+     for(let i=0;i<4;i++){
+      entity.dustParticles.push({
+       x:entity.x+rand(-1.65,1.65),
+       z:entity.z+rand(-.9,.9),
+       height:rand(.18,4.65),
+       size:rand(1.9,3.6),
+       vx:rand(-.22,.22),
+       vz:rand(-.2,.2),
+       vh:rand(-.12,.12),
+       age:0,
+       life:rand(.28,.62)
+      });
+     }
+     if(entity.dustParticles.length>84)entity.dustParticles.splice(0,entity.dustParticles.length-84);
+     entity.dustTimer=.055;
+    }
+    if(entity.phase==='charge'){
+     const distance=Math.hypot(entity.x-player.x,entity.z-player.z);
+     if(distance<=A60_DAMAGE_RADIUS){
+      shake=Math.max(shake,(1-distance/A60_DAMAGE_RADIUS)*52+3);
+      if(!isHiding&&!godMode){
+       dead=true;running=false;health=0;updateHud();setStatus('LOST');
+       showOverlay('A-60 FOUND YOU','Stay hidden until A-60 has passed.','TRY AGAIN','GAME OVER');return;
+      }
      }
     }
    }
@@ -876,35 +895,76 @@ function drawA60WorldRing(points,color,width){
  if(valid>=3){if(valid===projected.length)ctx.closePath();ctx.stroke()}
  ctx.restore();
 }
+function drawA60DustCloud(point,size,alpha){
+ const radius=clamp(point.scale*size,5,440);
+ const gradient=ctx.createRadialGradient(point.x,point.y,1,point.x,point.y,radius);
+ gradient.addColorStop(0,'rgba(95,0,0,.92)');
+ gradient.addColorStop(.38,'rgba(70,0,0,.78)');
+ gradient.addColorStop(.72,'rgba(48,0,0,.48)');
+ gradient.addColorStop(1,'rgba(25,0,0,0)');
+ ctx.save();
+ ctx.globalCompositeOperation='multiply';
+ ctx.globalAlpha=alpha;
+ ctx.fillStyle=gradient;
+ ctx.beginPath();ctx.arc(point.x,point.y,radius,0,Math.PI*2);ctx.fill();
+ ctx.restore();
+}
 function drawA60(){
  if(!entity||entity.type!=='A-60')return;
  const cameraPoint=cameraSpace(entity.x,entity.z,0);
  if(cameraPoint.forward<1.35||cameraPoint.forward>58)return;
  const visualHeight=4.8;
  const base=project(entity.x,entity.z,0),top=project(entity.x,entity.z,visualHeight);
- if(!base||!top||base.x<-520||base.x>W+520)return;
+ if(!base||!top||base.x<-620||base.x>W+620)return;
  const h=clamp(Math.abs(base.y-top.y),2,720),frame=a60Frames[a60FrameIndex];
  const aspect=frame&&frame.naturalWidth&&frame.naturalHeight?frame.naturalWidth/frame.naturalHeight:1;
  const w=clamp(h*aspect,2,900);
  if(h<2||w<2||!Number.isFinite(h+w))return;
  const alpha=entity.phase==='fade'?clamp(1-entity.age/1.25,0,1):1;
  const centerY=top.y+h*.5;
- const floorRadius=clamp(w*.9,55,260);
+ const floorRadius=clamp(w*.95,65,280);
 
  ctx.save();
  ctx.globalCompositeOperation='screen';
- ctx.globalAlpha=alpha;
- const floorGlow=ctx.createRadialGradient(base.x,base.y,2,base.x,base.y+8,floorRadius);
- floorGlow.addColorStop(0,'rgba(190,0,0,1)');
- floorGlow.addColorStop(.38,'rgba(125,0,0,1)');
- floorGlow.addColorStop(.72,'rgba(76,0,0,1)');
- floorGlow.addColorStop(1,'rgba(35,0,0,1)');
+ ctx.globalAlpha=alpha*.94;
+ const floorGlow=ctx.createRadialGradient(base.x,base.y,1,base.x,base.y+9,floorRadius);
+ floorGlow.addColorStop(0,'rgba(155,0,0,1)');
+ floorGlow.addColorStop(.32,'rgba(115,0,0,.98)');
+ floorGlow.addColorStop(.72,'rgba(72,0,0,.78)');
+ floorGlow.addColorStop(1,'rgba(28,0,0,0)');
  ctx.fillStyle=floorGlow;
- ctx.beginPath();ctx.ellipse(base.x,base.y+8,floorRadius,Math.max(12,floorRadius*.17),0,0,Math.PI*2);ctx.fill();
+ ctx.beginPath();ctx.ellipse(base.x,base.y+9,floorRadius,Math.max(14,floorRadius*.2),0,0,Math.PI*2);ctx.fill();
  ctx.restore();
 
- const horizontalAngle=entity.ringTime*10.5;
- const horizontalPoints=[];
+ const trailStart=Math.max(0,entity.dustTrail.length-20);
+ for(let i=trailStart;i<entity.dustTrail.length;i++){
+  const trail=entity.dustTrail[i],point=project(trail.x,trail.z,.22);
+  if(!point)continue;
+  const fade=clamp(1-trail.age/trail.life,0,1);
+  const radius=clamp(point.scale*trail.size,7,300);
+  ctx.save();
+  ctx.globalCompositeOperation='source-over';
+  ctx.globalAlpha=alpha*fade*.24;
+  ctx.fillStyle='#690000';
+  ctx.shadowColor='#710000';
+  ctx.shadowBlur=radius*.42;
+  ctx.beginPath();ctx.ellipse(point.x,point.y,radius,radius*.26,-.08,0,Math.PI*2);ctx.fill();
+  ctx.restore();
+ }
+
+ const bodyCloud=ctx.createRadialGradient(base.x,centerY,2,base.x,centerY,Math.max(w,h)*.72);
+ bodyCloud.addColorStop(0,'rgba(92,0,0,.72)');
+ bodyCloud.addColorStop(.48,'rgba(66,0,0,.64)');
+ bodyCloud.addColorStop(.82,'rgba(40,0,0,.32)');
+ bodyCloud.addColorStop(1,'rgba(20,0,0,0)');
+ ctx.save();
+ ctx.globalCompositeOperation='multiply';
+ ctx.globalAlpha=alpha;
+ ctx.fillStyle=bodyCloud;
+ ctx.beginPath();ctx.ellipse(base.x,centerY,w*.72,h*.58,0,0,Math.PI*2);ctx.fill();
+ ctx.restore();
+
+ const horizontalAngle=entity.ringTime*10.5,horizontalPoints=[];
  for(let i=0;i<=64;i++){
   const t=i/64*Math.PI*2,localX=Math.cos(t)*3.1,localZ=Math.sin(t)*3.7;
   const x=localX*Math.cos(horizontalAngle)-localZ*Math.sin(horizontalAngle);
@@ -917,19 +977,8 @@ function drawA60(){
   verticalPoints.push({x:entity.x+Math.cos(t)*r*Math.cos(verticalAngle),z:entity.z+Math.cos(t)*r*Math.sin(verticalAngle),height:2.45+Math.sin(t)*r});
  }
  ctx.save();ctx.globalAlpha=alpha;ctx.globalCompositeOperation='source-over';
- drawA60WorldRing(horizontalPoints,'#a90000',clamp(120/cameraPoint.forward,2,8));
- drawA60WorldRing(verticalPoints,'#d00000',clamp(150/cameraPoint.forward,2,9));
- ctx.restore();
-
- ctx.save();ctx.globalCompositeOperation='source-over';ctx.globalAlpha=alpha;ctx.strokeStyle='#9c0000';ctx.fillStyle='#b30000';ctx.shadowColor='#e00000';ctx.shadowBlur=9;ctx.lineCap='round';
- for(const beam of entity.beams){
-  const start=project(beam.x,beam.z,beam.height),end=project(beam.x+beam.dx,beam.z+beam.dz,beam.height+beam.dy);
-  if(!start||!end)continue;
-  const beamWidth=clamp(start.scale*.11,2,7);
-  ctx.lineWidth=beamWidth;ctx.beginPath();ctx.moveTo(start.x,start.y);ctx.lineTo(end.x,end.y);ctx.stroke();
-  ctx.strokeStyle='#e00000';ctx.lineWidth=Math.max(1,beamWidth*.28);
-  ctx.beginPath();ctx.moveTo(start.x,start.y);ctx.lineTo(end.x,end.y);ctx.stroke();ctx.strokeStyle='#9c0000';
- }
+ drawA60WorldRing(horizontalPoints,'#760000',clamp(120/cameraPoint.forward,2,8));
+ drawA60WorldRing(verticalPoints,'#a00000',clamp(150/cameraPoint.forward,2,9));
  ctx.restore();
 
  const drawFrame=(frameIndex,offsetX,offsetY,frameAlpha)=>{
@@ -939,23 +988,11 @@ function drawA60(){
   if(!frameBase||!frameTop)return;
   const frameHeight=clamp(Math.abs(frameBase.y-frameTop.y),2,720);
   const frameWidth=clamp(frameHeight*(image.naturalWidth/image.naturalHeight),2,900);
-  ctx.save();ctx.globalAlpha=alpha*frameAlpha;ctx.globalCompositeOperation='lighter';
-  ctx.filter='sepia(1) saturate(7) hue-rotate(320deg) brightness(1.15) contrast(1.22)';
-  ctx.shadowColor='#ed0000';ctx.shadowBlur=18;ctx.imageSmoothingEnabled=true;
+  ctx.save();ctx.globalAlpha=alpha*frameAlpha;ctx.globalCompositeOperation='source-over';
+  ctx.filter='sepia(1) saturate(7) hue-rotate(320deg) brightness(1.12) contrast(1.22)';
+  ctx.shadowColor='#a00000';ctx.shadowBlur=12;ctx.imageSmoothingEnabled=true;
   ctx.drawImage(image,frameBase.x-frameWidth/2,frameTop.y,frameWidth,frameHeight);
   ctx.restore();
-
-  if([0,1,4,5].includes(frameIndex)){
-   ctx.save();ctx.globalCompositeOperation='lighter';ctx.globalAlpha=alpha*frameAlpha;
-   const eyeY=frameTop.y+frameHeight*.28,eyeOffset=frameWidth*.165,eyeRadius=clamp(frameWidth*.047,3,15);
-   for(const side of [-1,1]){
-    const eyeX=frameBase.x+eyeOffset*side,eyeGlow=ctx.createRadialGradient(eyeX,eyeY,1,eyeX,eyeY,eyeRadius*2.3);
-    eyeGlow.addColorStop(0,'rgba(255,255,255,1)');eyeGlow.addColorStop(.34,'rgba(255,245,245,1)');eyeGlow.addColorStop(1,'rgba(255,0,0,0)');
-    ctx.fillStyle=eyeGlow;ctx.beginPath();ctx.arc(eyeX,eyeY,eyeRadius*2.3,0,Math.PI*2);ctx.fill();
-    ctx.fillStyle='#ffffff';ctx.beginPath();ctx.ellipse(eyeX,eyeY,eyeRadius*.62,eyeRadius,0,0,Math.PI*2);ctx.fill();
-   }
-   ctx.restore();
-  }
  };
 
  const trailAlphas=[.18,.3,.46];
@@ -964,6 +1001,13 @@ function drawA60(){
   drawFrame(trail.index,trail.x,trail.y,trailAlphas[i]||.18);
  }
  drawFrame(a60FrameIndex,a60CurrentOffset.x,a60CurrentOffset.y,1);
+
+ for(const particle of entity.dustParticles){
+  const point=project(particle.x,particle.z,particle.height);
+  if(!point||point.forward>58||point.x<-500||point.x>W+500)continue;
+  const fade=clamp(1-particle.age/particle.life,0,1);
+  drawA60DustCloud(point,particle.size,alpha*fade*.82);
+ }
 }
 function drawA1(){
  if(!entity||entity.type!=='A-1')return;
