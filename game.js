@@ -313,7 +313,7 @@ function update(dt){
   else if(door){if(statusEl.dataset.state!=='door'){setStatus('PRESS E TO OPEN DOOR');doorHint=true;statusEl.dataset.state='door'}}
   else if(doorHint||statusEl.dataset.state==='closet'||statusEl.dataset.state==='desk'||statusEl.dataset.state==='door'){setStatus(room===0?'LOBBY':'LISTEN');doorHint=false;delete statusEl.dataset.state}
  }else if(statusEl.dataset.state!=='hidden'){
-  setStatus(hidingType==='desk'?'UNDER DESK — PRESS E TO EXIT':'INSIDE STEEL CABINET — PRESS E TO EXIT');statusEl.dataset.state='hidden';
+  setStatus(hidingStatus());statusEl.dataset.state='hidden';
  }
  for(let entityIndex=entities.length-1;entityIndex>=0;entityIndex--){
   entity=entities[entityIndex];
@@ -651,13 +651,21 @@ function closetForRoom(roomNumber){
  const z=roomNumber*ROOM_LENGTH+11.5;
  const side=roomNumber%2===0?-1:1;
  const half=halfWidthAt(z);
- return {room:roomNumber,type:'cabinet',z,x:side*(half-.14),side};
+ return {room:roomNumber,type:'gray-cabinet',z,x:side*(half-.14),side};
+}
+function blueCabinetForRoom(roomNumber){
+ const z=roomNumber*ROOM_LENGTH+6.5;
+ const side=roomNumber%2===0?1:-1;
+ const half=halfWidthAt(z);
+ return {room:roomNumber,type:'blue-cabinet',z,x:side*(half-.14),side};
 }
 function findNearbyCloset(){
  let closest=null,best=Infinity;
  for(let n=retainedRoomFloor();n<=room+1;n++){
-  const closet=closetForRoom(n),distance=Math.hypot(player.x-closet.x,player.z-closet.z);
-  if(distance<best){best=distance;closest=closet}
+  for(const cabinet of [closetForRoom(n),blueCabinetForRoom(n)]){
+   const distance=Math.hypot(player.x-cabinet.x,player.z-cabinet.z);
+   if(distance<best){best=distance;closest=cabinet}
+  }
  }
  return best<3.25?closest:null;
 }
@@ -677,7 +685,39 @@ function findNearbyDesk(){
  }
  return best<2.5?closest:null;
 }
-function drawCloset(c){
+function drawGrayCloset(c){
+ const z=c.z,height=2.35,z0=z-.54,z1=z+.54;
+ const frontX=c.x-c.side*.23,backX=c.x+c.side*.05,faceX=frontX-c.side*.018;
+ const base=project(c.x,z,.015);
+ if(base&&base.forward<58){
+  const shadowRadius=clamp(base.scale*.4,2,40);
+  ctx.save();ctx.globalAlpha=.25;ctx.fillStyle='#080d11';
+  ctx.beginPath();ctx.ellipse(base.x,base.y+2,shadowRadius,Math.max(2,shadowRadius*.18),0,0,Math.PI*2);ctx.fill();ctx.restore();
+ }
+ worldPolygon([[backX,z0,0],[frontX,z0,0],[frontX,z0,height],[backX,z0,height]],'#343b40','#87949a');
+ worldPolygon([[frontX,z1,0],[backX,z1,0],[backX,z1,height],[frontX,z1,height]],'#252d33','#68757c');
+ worldPolygon([[backX,z0,height],[frontX,z0,height],[frontX,z1,height],[backX,z1,height]],'#68747b','#aab5b9');
+ worldPolygon([[backX,z0,0],[frontX,z0,0],[frontX,z1,0],[backX,z1,0]],'#1b242a','#5a6870');
+ worldPolygon([[frontX,z0,0],[frontX,z1,0],[frontX,z1,height],[frontX,z0,height]],'#30383e','#aeb9bd');
+ worldPolygon([[faceX,z0+.035,.08],[faceX,z1-.035,.08],[faceX,z1-.035,height-.07],[faceX,z0+.035,height-.07]],'#68757c','#c1cbd0');
+ worldPolygon([[faceX-c.side*.012,z0+.12,.20],[faceX-c.side*.012,z1-.12,.20],[faceX-c.side*.012,z1-.12,height-.20],[faceX-c.side*.012,z0+.12,height-.20]],'#77858c','#aeb9bd');
+ worldPolygon([[faceX-c.side*.022,z0+.19,.29],[faceX-c.side*.022,z1-.19,.29],[faceX-c.side*.022,z1-.19,height-.31],[faceX-c.side*.022,z0+.19,height-.31]],'#56636b','#89979e');
+ worldLine([faceX-c.side*.035,z0+.10,.12],[faceX-c.side*.035,z0+.10,height-.12],'#d0d7d9',1.7);
+ worldLine([faceX-c.side*.035,z1-.10,.12],[faceX-c.side*.035,z1-.10,height-.12],'#283239',1.7);
+ worldLine([faceX-c.side*.035,z0+.10,height-.12],[faceX-c.side*.035,z1-.10,height-.12],'#c0c9cd',1.5);
+ for(const ventY of [.42,.50,.58]){
+  worldLine([faceX-c.side*.045,z-.18,ventY*3.2],[faceX-c.side*.045,z+.18,ventY*3.2],'#354047',1.5);
+ }
+ const handleX=faceX-c.side*.052;
+ worldPolygon([[handleX,z+.29,.76],[handleX,z+.37,.76],[handleX,z+.37,1.40],[handleX,z+.29,1.40]],'#25313a','#c0cbd0');
+ worldLine([handleX-c.side*.008,z+.33,.82],[handleX-c.side*.008,z+.33,1.34],'#e3e8e8',1.3);
+ const plate=project(faceX-c.side*.045,z,2.43);
+ if(plate&&plate.forward<58){
+  ctx.save();ctx.fillStyle='#c4cdd0';ctx.strokeStyle='#56636b';ctx.lineWidth=1;
+  ctx.fillRect(plate.x-6,plate.y-2,12,4);ctx.strokeRect(plate.x-6,plate.y-2,12,4);ctx.restore();
+ }
+}
+function drawBlueCabinet(c){
  const z=c.z,height=2.42,z0=z-.58,z1=z+.58;
  const frontX=c.x-c.side*.28,backX=c.x+c.side*.075,faceX=frontX-c.side*.022;
  const base=project(c.x,z,.015);
@@ -725,14 +765,22 @@ function drawCloset(c){
  }
 }
 function drawClosets(){
- for(let n=room+1;n>=retainedRoomFloor();n--)drawCloset(closetForRoom(n));
+ for(let n=room+1;n>=retainedRoomFloor();n--){
+  drawGrayCloset(closetForRoom(n));
+  drawBlueCabinet(blueCabinetForRoom(n));
+ }
 }
 
+function hidingStatus(){
+ if(hidingType==='desk')return 'UNDER DESK — PRESS E TO EXIT';
+ if(hidingType==='blue-cabinet')return 'INSIDE BLUE STEEL CABINET — PRESS E TO EXIT';
+ return 'INSIDE STEEL CABINET — PRESS E TO EXIT';
+}
 function enterHidingSpot(spot){
  clearMovementKeys();hideExitGrace=0;
- isHiding=true;hidingCloset=spot;hidingType=spot.type==='desk'?'desk':'cabinet';
+ isHiding=true;hidingCloset=spot;hidingType=spot.type==='desk'?'desk':spot.type;
  if(hidingType==='desk'){player.x=spot.x-spot.side*.3;player.z=spot.z+.15}else{player.x=spot.side*(halfWidthAt(spot.z)-.78);player.z=spot.z}
- keys=Object.create(null);setStatus(hidingType==='desk'?'UNDER DESK — PRESS E TO EXIT':'INSIDE STEEL CABINET — PRESS E TO EXIT');sound(95,.22,'triangle',.018);
+ keys=Object.create(null);setStatus(hidingStatus());sound(95,.22,'triangle',.018);
 }
 function exitCloset(){isHiding=false;hidingCloset=null;hidingType=null;hideExitGrace=1.5;setStatus('LISTEN');sound(155,.16,'triangle',.018)}
 function interact(){
@@ -753,6 +801,36 @@ function drawHidingView(){
   ctx.fillStyle=underside;ctx.fillRect(0,0,W,H*.38);
   ctx.fillStyle='rgba(24,20,15,.82)';ctx.fillRect(0,H*.38,W,H*.08);
   ctx.fillStyle='rgba(9,13,13,.56)';ctx.fillRect(W*.12,H*.46,W*.76,H*.54);
+  ctx.restore();return;
+ }
+ if(hidingType==='gray-cabinet'){
+  const gray=ctx.createLinearGradient(0,0,W,0);
+  gray.addColorStop(0,'#111a20');gray.addColorStop(.14,'#5b6870');gray.addColorStop(.5,'#263139');
+  gray.addColorStop(.86,'#5b6870');gray.addColorStop(1,'#111a20');
+  ctx.fillStyle=gray;ctx.fillRect(0,0,W,H);
+  const rear=ctx.createLinearGradient(0,0,0,H);
+  rear.addColorStop(0,'#59656c');rear.addColorStop(.45,'#252f36');rear.addColorStop(1,'#111a20');
+  ctx.fillStyle=rear;ctx.fillRect(W*.20,0,W*.60,H);
+  ctx.fillStyle='#0b1217';ctx.fillRect(W*.285,0,W*.43,H);
+  const inset=ctx.createLinearGradient(0,0,W*.43,0);
+  inset.addColorStop(0,'#303d45');inset.addColorStop(.5,'#59666e');inset.addColorStop(1,'#303d45');
+  ctx.fillStyle=inset;ctx.fillRect(W*.29,0,W*.42,H);
+  ctx.fillStyle='#111a20';ctx.fillRect(W*.492,0,W*.016,H);
+  ctx.fillStyle='#b4c0c6';ctx.fillRect(W*.487,0,W*.005,H);ctx.fillRect(W*.508,0,W*.005,H);
+  ctx.strokeStyle='#9eabb2';ctx.lineWidth=2;
+  ctx.beginPath();ctx.moveTo(W*.20,0);ctx.lineTo(W*.29,H);ctx.moveTo(W*.80,0);ctx.lineTo(W*.71,H);ctx.stroke();
+  ctx.strokeStyle='#202a31';ctx.lineWidth=1.5;
+  for(let i=0;i<8;i++){
+   const x=W*(.035+i*.017);
+   ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x+W*.035,H);ctx.stroke();
+   const xr=W-x;
+   ctx.beginPath();ctx.moveTo(xr,0);ctx.lineTo(xr-W*.035,H);ctx.stroke();
+  }
+  for(let i=0;i<4;i++){
+   const y=H*(.19+i*.045);
+   ctx.fillStyle='#10191f';ctx.fillRect(W*.06,y,W*.105,4);ctx.fillRect(W*.835,y,W*.105,4);
+   ctx.fillStyle='#a3b0b7';ctx.fillRect(W*.06,y+4,W*.105,1);ctx.fillRect(W*.835,y+4,W*.105,1);
+  }
   ctx.restore();return;
  }
  const outer=ctx.createLinearGradient(0,0,W,0);
@@ -856,8 +934,10 @@ function drawSceneObjects(){
    }
   }
   for(let n=range.start;n<=range.end;n++){
-   const closet=closetForRoom(n);
-   items.push({depth:cameraSpace(closet.x,closet.z,1.15).forward,draw:()=>drawCloset(closet)});
+   const grayCabinet=closetForRoom(n);
+   items.push({depth:cameraSpace(grayCabinet.x,grayCabinet.z,1.15).forward,draw:()=>drawGrayCloset(grayCabinet)});
+   const blueCabinet=blueCabinetForRoom(n);
+   items.push({depth:cameraSpace(blueCabinet.x,blueCabinet.z,1.15).forward,draw:()=>drawBlueCabinet(blueCabinet)});
    for(let slot=0;slot<2;slot++){
     const desk=deskForRoom(n,slot);
     items.push({depth:cameraSpace(desk.x,desk.z,.8).forward,draw:()=>drawDesk(desk)});
