@@ -7,7 +7,7 @@
 <title>ROOMS — Low Detailed</title>
 <link rel="stylesheet" href="./style.css">
 </head>
-<body>
+<body data-root-path="." data-current-game="rooms">
 <main class="shell">
 <section class="gameframe">
 <canvas id="game" width="960" height="540" aria-label="First person Rooms game"></canvas>
@@ -16,15 +16,16 @@
 <canvas id="room-label" class="room-label" width="150" height="23" aria-label="Room counter"></canvas>
 <div class="health-wrap" id="health-wrap"><div class="health-track"><div class="health-fill" id="health-fill"></div></div></div>
 <div class="status" id="status">LISTEN</div>
-<div class="actions"><button class="btn" id="admin-toggle" type="button">ADMIN</button><button class="btn" id="mute">SOUND ON</button><button class="btn" id="pause">PAUSE</button></div>
+<div class="actions"><button class="btn" id="settings-toggle" type="button">SETTINGS</button><button class="btn" id="admin-toggle" type="button">ADMIN</button><button class="btn" id="mute">SOUND ON</button><button class="btn" id="pause">PAUSE</button></div>
 <div class="touch-controls" id="touch-controls" aria-label="Touch controls"><div class="touch-pad"><button class="touch-btn touch-empty" type="button" tabindex="-1"></button><button class="touch-btn" type="button" data-touch-key="w">▲</button><button class="touch-btn touch-empty" type="button" tabindex="-1"></button><button class="touch-btn" type="button" data-touch-key="a">◀</button><button class="touch-btn" type="button" data-touch-key="s">▼</button><button class="touch-btn" type="button" data-touch-key="d">▶</button></div><div class="touch-actions"><button class="touch-btn run" type="button" data-touch-key="shift">RUN</button><button class="touch-btn action" type="button" id="touch-e">E</button><button class="touch-btn action" type="button" id="touch-f">F</button></div></div>
 <div class="controls">
 <span>W / S — MOVE</span><span>A / D — STRAFE</span><span>RIGHT MOUSE + DRAG — LOOK UP / DOWN / AROUND</span><span>E — HIDE / OPEN DOOR / EXIT</span><span>F — FLASHLIGHT</span><span>SHIFT — RUN</span>
 </div>
 </section>
 <div class="admin-panel" id="admin-panel" aria-hidden="true"><div class="admin-heading" data-pixel>ADMIN CONTROL</div><form id="admin-form"><section class="admin-section"><label for="admin-room" data-pixel>TELEPORT TO ROOM</label><div class="admin-row"><input id="admin-room" name="room" type="number" min="0" max="999" step="1" value="0" inputmode="numeric" required><button class="btn" type="submit" data-pixel>GO</button></div><div class="admin-note" data-pixel>0 = Lobby. Enter a room from 1 to 999.</div></section><div class="admin-divider"></div><section class="admin-section"><label for="admin-entity" data-pixel>SPAWN ENTITIES</label><select id="admin-entity" name="entity"><option value="A-1">A-1</option><option value="A-25">A-25</option><option value="C-25">C-25</option><option value="A-45">A-45</option><option value="C-45">C-45</option><option value="A-60">A-60</option><option value="C-60" disabled>C-60 — COMING SOON</option></select><button class="btn" id="admin-spawn" type="button" data-pixel>SPAWN SELECTED ENTITY</button><div class="admin-note" data-pixel>Up to 6 active entities. Each has independent movement, effects and despawn timers. Rooms render only near the player and active entities.</div></section><div class="admin-divider"></div><section class="admin-section"><label class="admin-switch" for="admin-god-mode"><input id="admin-god-mode" type="checkbox"><span class="admin-switch-track" aria-hidden="true"></span><span data-pixel>GOD MODE — ALWAYS IMMORTAL</span></label><div class="admin-note" data-pixel>Ignore all entity damage while enabled.</div></section><div class="admin-divider"></div><div class="admin-feedback" id="admin-feedback" data-pixel>ADMIN READY</div><div class="admin-panel-actions"><button class="btn" id="admin-close" type="button" data-pixel>CLOSE PANEL</button></div></form></div>
-<div class="overlay" id="overlay"><div class="dialog"><div class="eyebrow" id="overlay-eyebrow">ROOM 000</div><h1 id="overlay-title">PAUSED</h1><p id="overlay-copy">The hallway is waiting.</p><button class="btn" id="resume">RESUME</button></div></div>
+<div class="settings-panel" id="settings-panel" aria-hidden="true"><div class="settings-heading">GAME SETTINGS</div><div class="settings-section"><label for="game-mode">GAME MODE</label><select id="game-mode"><option value="rooms">ROOMS</option><option value="doors">DOORS</option></select><div class="settings-note">Load a separate game mode from its own folder.</div><div class="settings-actions"><button class="btn" id="game-switch" type="button">LOAD GAME</button><button class="btn" id="settings-close" type="button">CLOSE</button></div></div></div><div class="overlay" id="overlay"><div class="dialog"><div class="eyebrow" id="overlay-eyebrow">ROOM 000</div><h1 id="overlay-title">PAUSED</h1><p id="overlay-copy">The hallway is waiting.</p><button class="btn" id="resume">RESUME</button></div></div>
 </main>
 <script src="./game.js" defer></script>
+<script src="./mode-selector.js" defer></script>
 </body>
 </html>
