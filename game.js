@@ -245,6 +245,7 @@ canvas.addEventListener('pointermove',e=>{if(!rightDragging)return;const dx=e.cl
 const stopRightDrag=()=>{rightDragging=false};
 canvas.addEventListener('pointerup',stopRightDrag);canvas.addEventListener('pointercancel',stopRightDrag);
 function update(dt){
+ updateA60Animation();
  if(hideExitGrace>0)hideExitGrace=Math.max(0,hideExitGrace-dt);
  for(const state of doorStates.values())state.angle=Math.min(1.35,state.angle+dt*3.4);
  if(!isHiding){
@@ -722,8 +723,50 @@ a60Sprite.decoding='async';
 a60Sprite.src='./assets/a60.gif';
 a60Sprite.alt='';
 a60Sprite.setAttribute('aria-hidden','true');
-a60Sprite.style.cssText='position:fixed;left:0;top:0;width:2px;height:2px;opacity:0;pointer-events:none;z-index:-1;';
+a60Sprite.style.cssText='position:fixed;left:1px;top:1px;width:4px;height:4px;opacity:.01;pointer-events:none;z-index:2147483647;';
 document.body.appendChild(a60Sprite);
+const a60Animation={decoder:null,frame:null,frameIndex:0,frameCount:0,nextFrameAt:0,loading:false};
+async function decodeA60Frame(index){
+ if(!a60Animation.decoder||a60Animation.loading)return;
+ a60Animation.loading=true;
+ try{
+  const result=await a60Animation.decoder.decode({frameIndex:index,completeFramesOnly:true});
+  const previous=a60Animation.frame;
+  a60Animation.frame=result.image;
+  a60Animation.frameIndex=index;
+  a60Animation.nextFrameAt=performance.now()+Math.max(20,(result.image.duration||100000)/1000);
+  if(previous&&previous!==result.image)previous.close();
+ }catch(error){
+  a60Animation.frameIndex=0;
+  a60Animation.nextFrameAt=performance.now()+100;
+  console.warn('A-60 GIF frame decode failed',error);
+ }finally{
+  a60Animation.loading=false;
+ }
+}
+async function loadA60Animation(){
+ if(typeof ImageDecoder==='undefined')return;
+ try{
+  const response=await fetch('./assets/a60.gif',{cache:'force-cache'});
+  if(!response.ok)throw new Error('A-60 GIF request failed: '+response.status);
+  const data=await response.arrayBuffer();
+  const decoder=new ImageDecoder({data,type:'image/gif'});
+  await decoder.tracks.ready;
+  const track=decoder.tracks.selectedTrack;
+  if(!track||track.frameCount<2)throw new Error('A-60 GIF has no animated frames');
+  a60Animation.decoder=decoder;
+  a60Animation.frameCount=track.frameCount;
+  await decodeA60Frame(0);
+ }catch(error){
+  console.warn('A-60 animated decoder unavailable; using browser image fallback',error);
+ }
+}
+function updateA60Animation(){
+ if(!a60Animation.decoder||!a60Animation.frame||a60Animation.loading||performance.now()<a60Animation.nextFrameAt)return;
+ const next=(a60Animation.frameIndex+1)%a60Animation.frameCount;
+ decodeA60Frame(next);
+}
+loadA60Animation();
 function drawA1SpriteAt(worldX,worldZ,height,alpha,baseHeight=0,glow=true){
  if(!a1Sprite.complete||!a1Sprite.naturalWidth)return;
  const cameraPoint=cameraSpace(worldX,worldZ,baseHeight);
@@ -827,18 +870,21 @@ function drawA60(){
  if(!entity||entity.type!=='A-60')return;
  const cameraPoint=cameraSpace(entity.x,entity.z,0);
  if(cameraPoint.forward<1.35||cameraPoint.forward>58)return;
- const visualHeight=6.2;
+ const visualHeight=7.2;
  const base=project(entity.x,entity.z,0),top=project(entity.x,entity.z,visualHeight);
- if(!base||!top||base.x<-340||base.x>W+340)return;
- const h=clamp(Math.abs(base.y-top.y),2,760);
- const aspect=a60Sprite.naturalWidth&&a60Sprite.naturalHeight?a60Sprite.naturalWidth/a60Sprite.naturalHeight:.62;
- const w=clamp(h*aspect,2,900);
+ if(!base||!top||base.x<-440||base.x>W+440)return;
+ const h=clamp(Math.abs(base.y-top.y),2,900);
+ const source=a60Animation.frame||a60Sprite;
+ const sourceWidth=source.displayWidth||source.naturalWidth||1;
+ const sourceHeight=source.displayHeight||source.naturalHeight||1;
+ const aspect=sourceWidth/sourceHeight;
+ const w=clamp(h*aspect,2,1100);
  if(h<2||w<2||!Number.isFinite(h+w))return;
  const alpha=entity.phase==='fade'?clamp(1-entity.age/1.25,0,1):1;
  ctx.save();
  ctx.globalAlpha=alpha;
  ctx.imageSmoothingEnabled=true;
- if(a60Sprite.complete&&a60Sprite.naturalWidth)ctx.drawImage(a60Sprite,base.x-w/2,top.y,w,h);
+ if(a60Animation.frame||a60Sprite.complete&&a60Sprite.naturalWidth)ctx.drawImage(source,base.x-w/2,top.y,w,h);
  else{
   ctx.fillStyle='rgba(245,245,245,.75)';
   ctx.beginPath();ctx.ellipse(base.x,top.y+h*.5,w*.28,h*.46,0,0,Math.PI*2);ctx.fill();
