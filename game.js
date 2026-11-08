@@ -356,11 +356,19 @@ function update(dt){
     }
    }else if(entity.phase==='wait'){
     entity.age+=dt;
+    if(entity.age>=entity.waitDuration){
+     entity.phase='fade';
+     entity.age=0;
+     setStatus('A-60 IS FADING OUT');
+    }
    }else if(entity.phase==='fade'){
     entity.age+=dt;
     if(entity.age>=1.25){
      entity=null;
      a60FrameTrail=[];
+     a60FrameIndex=0;
+     a60FrameTimer=0;
+     a60CurrentOffset={x:0,y:0};
      setStatus('A-60 DESPAWNED');
     }
    }
