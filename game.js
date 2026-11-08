@@ -892,7 +892,8 @@ function drawA60(){
  const floorRadius=clamp(w*.9,55,260);
 
  ctx.save();
- ctx.globalCompositeOperation='multiply';
+ ctx.globalCompositeOperation='screen';
+ ctx.globalAlpha=alpha;
  const floorGlow=ctx.createRadialGradient(base.x,base.y,2,base.x,base.y+8,floorRadius);
  floorGlow.addColorStop(0,'rgba(190,0,0,1)');
  floorGlow.addColorStop(.38,'rgba(125,0,0,1)');
@@ -920,7 +921,7 @@ function drawA60(){
  drawA60WorldRing(verticalPoints,'#d00000',clamp(150/cameraPoint.forward,2,9));
  ctx.restore();
 
- ctx.save();ctx.globalCompositeOperation='source-over';ctx.strokeStyle='#9c0000';ctx.fillStyle='#b30000';ctx.shadowColor='#e00000';ctx.shadowBlur=9;ctx.lineCap='round';
+ ctx.save();ctx.globalCompositeOperation='source-over';ctx.globalAlpha=alpha;ctx.strokeStyle='#9c0000';ctx.fillStyle='#b30000';ctx.shadowColor='#e00000';ctx.shadowBlur=9;ctx.lineCap='round';
  for(const beam of entity.beams){
   const start=project(beam.x,beam.z,beam.height),end=project(beam.x+beam.dx,beam.z+beam.dz,beam.height+beam.dy);
   if(!start||!end)continue;
