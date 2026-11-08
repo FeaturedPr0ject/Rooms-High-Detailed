@@ -13,9 +13,26 @@ let keys=Object.create(null),entity=null,entityCooldown=0,doorHint=false,mouseTu
 const entities=[];
 let nextEntityId=1;
 const MAX_ACTIVE_ENTITIES=6;
-function registerEntity(data){if(entities.length>=MAX_ACTIVE_ENTITIES)return null;data.id=nextEntityId++;data.grounded=true;data.verticalVelocity=0;entities.push(data);entity=data;return data}
+function registerEntity(data){if(entities.length>=MAX_ACTIVE_ENTITIES)return null;data.id=nextEntityId++;data.height=Number.isFinite(data.height)?data.height:0;data.grounded=true;data.verticalVelocity=0;entities.push(data);entity=data;return data}
 function countEntities(type){return entities.filter(item=>!type||item.type===type).length}
-function updateEntityPhysics(item){if(!Number.isFinite(item.z)||!Number.isFinite(item.x)){item.z=Math.max(0,Number.isFinite(item.z)?item.z:0);item.x=0}item.z=Math.max(0,item.z);const half=halfWidthAt(item.z)-.18;item.x=clamp(item.x,-half,half);item.verticalVelocity=0;item.grounded=true}
+function worldFloorHeightAt(z){return Number.isFinite(z)&&z>=0&&z<ROOM_LENGTH*1000?0:null}
+function updateEntityPhysics(item,dt){
+ if(!Number.isFinite(item.z)||!Number.isFinite(item.x)){item.z=Math.max(0,Number.isFinite(item.z)?item.z:0);item.x=0}
+ item.z=clamp(item.z,0,ROOM_LENGTH*1000-.1);
+ const floor=worldFloorHeightAt(item.z);
+ if(floor===null){item.z=Math.max(0,item.z);item.height=0;item.verticalVelocity=0;item.grounded=true}
+ else{
+  if(!Number.isFinite(item.height))item.height=floor;
+  if(!Number.isFinite(item.verticalVelocity))item.verticalVelocity=0;
+  if(!item.grounded||item.height>floor||item.verticalVelocity>0){
+   item.verticalVelocity-=18*dt;
+   item.height+=item.verticalVelocity*dt;
+   if(item.height<=floor){item.height=floor;item.verticalVelocity=0;item.grounded=true}else item.grounded=false;
+  }else{item.height=floor;item.verticalVelocity=0;item.grounded=true}
+ }
+ const half=halfWidthAt(item.z)-.18;
+ item.x=clamp(item.x,-half,half);
+}
 let a25Started=false,a25Completed=false,godMode=false,hideExitGrace=0;
 const player={x:0,z:5,yaw:0,speed:3.25};
 const PLAYER_RADIUS=.42,DOOR_CLEARANCE=.40;
@@ -507,7 +524,7 @@ function update(dt){
   if(entity===null){
    entities.splice(entityIndex,1);
    a25Started=entities.some(item=>item.type==='A-25'||item.type==='C-25');
-  }else updateEntityPhysics(entity);
+  }else updateEntityPhysics(entity,dt);
   if(dead){entity=null;return}
  }
  entity=entities.length?entities[entities.length-1]:null;
