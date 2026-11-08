@@ -7,7 +7,7 @@ const A25_ROOM=25,A25_SPEED=24,C25_SPEED=40,A45_SPEED=64.4,C45_SPEED=114.8,A60_S
 const roomLabel=document.getElementById('room-label'),roomCtx=roomLabel.getContext('2d');
 const statusEl=document.getElementById('status'),healthWrap=document.getElementById('health-wrap'),healthFill=document.getElementById('health-fill');
 const overlay=document.getElementById('overlay'),overlayTitle=document.getElementById('overlay-title'),overlayCopy=document.getElementById('overlay-copy'),overlayEyebrow=document.getElementById('overlay-eyebrow'),resumeBtn=document.getElementById('resume'),muteBtn=document.getElementById('mute'),pauseBtn=document.getElementById('pause'),hud=document.querySelector('.hud');
-const adminToggle=document.getElementById('admin-toggle'),adminPanel=document.getElementById('admin-panel'),adminForm=document.getElementById('admin-form'),adminRoomInput=document.getElementById('admin-room'),adminClose=document.getElementById('admin-close'),adminEntitySelect=document.getElementById('admin-entity'),adminSpawnButton=document.getElementById('admin-spawn'),adminFeedback=document.getElementById('admin-feedback'),adminGodMode=document.getElementById('admin-god-mode');
+const adminToggle=document.getElementById('admin-toggle'),adminPanel=document.getElementById('admin-panel'),adminForm=document.getElementById('admin-form'),adminRoomInput=document.getElementById('admin-room'),adminClose=document.getElementById('admin-close'),adminFeedback=document.getElementById('admin-feedback'),adminGodMode=document.getElementById('admin-god-mode');
 let room=0,furthestRoom=0,health=100,flashlight=true,running=true,paused=false,dead=false,mute=false,last=0,audio=null,shake=0,jumpscare=null;
 let keys=Object.create(null),entity=null,entityCooldown=0,doorHint=false,mouseTurn=0,isHiding=false,hidingCloset=null,hidingType=null;
 const entities=[];
@@ -161,38 +161,6 @@ function teleportToRoom(targetRoom){
  updateHud();setStatus('TELEPORTED TO '+(room===0?'LOBBY':'ROOM A-'+String(room).padStart(3,'0')));
  adminPanel.style.display='none';adminPanel.setAttribute('aria-hidden','true');
 }
-function spawnAdminEntity(){
- const selected=adminEntitySelect.value;
- if(entities.length>=MAX_ACTIVE_ENTITIES){adminFeedback.textContent='ENTITY LIMIT REACHED — MAX '+MAX_ACTIVE_ENTITIES;return}
- entityCooldown=0;
- if(selected==='A-1'){
-  const spawnRoom=Math.max(1,room);
-  registerEntity({type:'A-1',x:0,z:spawnRoom*ROOM_LENGTH+ROOM_LENGTH*.5,age:0,phase:'stare',stareTime:2,speed:ROOM_LENGTH*.58,damaged:false,damageTimer:0,cloneTimer:.08,clones:[]});
-  setStatus('ADMIN SPAWNED A-1');
-  adminFeedback.textContent='A-1 SPAWNS IN ROOM CENTER — 2 SECOND WARNING';
- }else if(selected==='A-25'||selected==='C-25'){
-  const spawnRoom=Math.max(1,room);
-  startA25Encounter(spawnRoom,false,selected==='C-25');
-  setStatus('ADMIN SPAWNED '+selected);
-  adminFeedback.textContent=selected+' SPAWNED FROM THE LOBBY';
- }else if(selected==='A-45'||selected==='C-45'){
-  const newestRoom=Math.max(0,room,furthestRoom);
-  startA45Encounter(newestRoom,selected);
-  setStatus('ADMIN SPAWNED '+selected);
-  adminFeedback.textContent=selected+' SPAWNS IN THE LOBBY, THEN CHARGES TO THE LATEST DOOR';
- }else if(selected==='A-60'){
-  const newestRoom=Math.max(1,room,furthestRoom);
-  startA60Encounter(newestRoom);
-  setStatus('ADMIN SPAWNED A-60');
-  adminFeedback.textContent='A-60 CHARGES TO THE LATEST ROOM CENTER, WAITS 4–6 SECONDS, THEN FADES';
- }else{
-  adminFeedback.textContent='UNKNOWN ENTITY';
-  return;
- }
- if(selected==='A-25'||selected==='C-25')a25Started=true;
- adminPanel.style.display='none';adminPanel.setAttribute('aria-hidden','true');
- sound(selected==='A-25'?62:selected==='C-25'?92:selected==='A-45'?125:selected==='C-45'?155:selected==='A-60'?165:118,.35,'sawtooth',.028);
-}
 function openDoor(direction){
  const boundary=direction>0?(room+1)*ROOM_LENGTH:room*ROOM_LENGTH;
  if(direction<0&&room<=retainedRoomFloor()){setStatus('PREVIOUS ROOM IS NO LONGER STORED');return false}
@@ -264,7 +232,6 @@ adminForm.addEventListener('submit',event=>{
  if(!Number.isInteger(value)||value<0||value>999){adminRoomInput.setCustomValidity('Enter a room from 0 to 999.');adminRoomInput.reportValidity();return}
  adminRoomInput.setCustomValidity('');teleportToRoom(value);
 });
-adminSpawnButton.addEventListener('click',spawnAdminEntity);
 const touchControls=document.getElementById('touch-controls');
 const touchE=document.getElementById('touch-e'),touchF=document.getElementById('touch-f');
 function releaseTouchControl(button){
