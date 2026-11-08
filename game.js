@@ -10,6 +10,12 @@ const overlay=document.getElementById('overlay'),overlayTitle=document.getElemen
 const adminToggle=document.getElementById('admin-toggle'),adminPanel=document.getElementById('admin-panel'),adminForm=document.getElementById('admin-form'),adminRoomInput=document.getElementById('admin-room'),adminClose=document.getElementById('admin-close'),adminEntitySelect=document.getElementById('admin-entity'),adminSpawnButton=document.getElementById('admin-spawn'),adminFeedback=document.getElementById('admin-feedback'),adminGodMode=document.getElementById('admin-god-mode');
 let room=0,furthestRoom=0,health=100,flashlight=true,running=true,paused=false,dead=false,mute=false,last=0,audio=null,shake=0;
 let keys=Object.create(null),entity=null,entityCooldown=0,doorHint=false,mouseTurn=0,isHiding=false,hidingCloset=null,hidingType=null;
+const entities=[];
+let nextEntityId=1;
+const MAX_ACTIVE_ENTITIES=6;
+function registerEntity(data){if(entities.length>=MAX_ACTIVE_ENTITIES)return null;data.id=nextEntityId++;data.grounded=true;data.verticalVelocity=0;entities.push(data);entity=data;return data}
+function countEntities(type){return entities.filter(item=>!type||item.type===type).length}
+function updateEntityPhysics(item){if(!Number.isFinite(item.z)||!Number.isFinite(item.x)){item.z=Math.max(0,Number.isFinite(item.z)?item.z:0);item.x=0}item.z=Math.max(0,item.z);const half=halfWidthAt(item.z)-.18;item.x=clamp(item.x,-half,half);item.verticalVelocity=0;item.grounded=true}
 let a25Started=false,a25Completed=false,godMode=false,hideExitGrace=0;
 const player={x:0,z:5,yaw:0,speed:3.25};
 const PLAYER_RADIUS=.42,DOOR_CLEARANCE=.40;
@@ -17,6 +23,13 @@ const movementKeyNames=['w','a','s','d','shift'];
 function clearMovementKeys(){for(const key of movementKeyNames)keys[key]=false}
 const doorStates=new Map();
 function retainedRoomFloor(){return Math.max(0,furthestRoom-ROOMS_KEPT_BEHIND)}
+function activeRoomRanges(){
+ const anchors=[room,...entities.map(item=>Math.max(0,Math.floor(item.z/ROOM_LENGTH)))];
+ const ranges=anchors.map(anchor=>({start:Math.max(0,anchor-2),end:anchor+2})).sort((a,b)=>a.start-b.start);
+ const merged=[];
+ for(const range of ranges){const last=merged[merged.length-1];if(last&&range.start<=last.end+1)last.end=Math.max(last.end,range.end);else merged.push({...range})}
+ return merged;
+}
 function pruneDoorStates(){const minimum=retainedRoomFloor()*ROOM_LENGTH;for(const boundary of doorStates.keys())if(boundary<minimum)doorStates.delete(boundary)}
 function doorIsOpen(boundary){const state=doorStates.get(boundary);return !!state&&state.angle>=1.12}
 let viewPitch=0,rightDragging=false,lastPointerX=0,lastPointerY=0;
@@ -73,7 +86,7 @@ function showOverlay(title,copy,button,eyebrow){
 function hideOverlay(){overlay.style.display='none'}
 function startNewRun(){
  clearMovementKeys();hideExitGrace=0;
- room=0;furthestRoom=0;doorStates.clear();health=100;player.x=0;player.z=5;player.yaw=0;viewPitch=0;entity=null;entityCooldown=0;a25Started=false;a25Completed=false;isHiding=false;hidingCloset=null;hidingType=null;dead=false;paused=false;running=true;keys=Object.create(null);
+ room=0;furthestRoom=0;doorStates.clear();health=100;player.x=0;player.z=5;player.yaw=0;viewPitch=0;entities.length=0;entity=null;nextEntityId=1;entityCooldown=0;a25Started=false;a25Completed=false;isHiding=false;hidingCloset=null;hidingType=null;dead=false;paused=false;running=true;keys=Object.create(null);
  updateHud();setStatus('LOBBY');hideOverlay();last=performance.now();sound(250,.12);requestAnimationFrame(loop);
 }
 function togglePause(){
@@ -90,26 +103,26 @@ function hurt(amount=15){
  else{setStatus('DANGER');player.z=Math.max(room*ROOM_LENGTH+.8,player.z-1.5);entityCooldown=7}
 }
 function startA25Encounter(targetRoom,allowC25=true,forceC25=false){
- a25Started=true;a25Completed=false;entityCooldown=0;
+ if(entities.length>=MAX_ACTIVE_ENTITIES)return null;
  const isC25=forceC25||(allowC25&&Math.random()<C25_SPAWN_CHANCE);
  const type=isC25?'C-25':'A-25',targetEnd=(targetRoom+1)*ROOM_LENGTH-.8;
- entity={type,x:0,z:1.2,age:0,direction:1,targetRoom,targetZ:targetEnd,rebounds:0,particleTimer:0,particles:[],speed:isC25?C25_SPEED:A25_SPEED,reboundLimit:isC25?5.5:2};
- setStatus(type+' SPAWNED IN THE LOBBY — HIDE NOW');
- sound(isC25?92:62,.8,'sawtooth',.035);
+ const created=registerEntity({type,x:0,z:1.2,age:0,direction:1,targetRoom,targetZ:targetEnd,rebounds:0,particleTimer:0,particles:[],speed:isC25?C25_SPEED:A25_SPEED,reboundLimit:isC25?5.5:2});
+ if(!created)return null;
+ a25Started=true;a25Completed=false;entityCooldown=0;
+ setStatus(type+' SPAWNED IN THE LOBBY — HIDE NOW');sound(isC25?92:62,.8,'sawtooth',.035);return created;
 }
 function startA45Encounter(targetRoom,type){
  const isC45=type==='C-45',stareTime=isC45?1.5:3;
  const targetEnd=(targetRoom+1)*ROOM_LENGTH-.8;
- entity={type,x:0,z:1.2,age:0,phase:'stare',stareTime,direction:1,targetRoom,targetZ:targetEnd,particleTimer:0,particles:[],speed:isC45?C45_SPEED:A45_SPEED};
- setStatus(type+' WAITING IN THE LOBBY — '+stareTime+' SECOND WARNING');
- sound(isC45?145:115,.65,'sawtooth',.04);
+ const created=registerEntity({type,x:0,z:1.2,age:0,phase:'stare',stareTime,direction:1,targetRoom,targetZ:targetEnd,particleTimer:0,particles:[],speed:isC45?C45_SPEED:A45_SPEED});
+ if(!created)return null;
+ setStatus(type+' WAITING IN THE LOBBY — '+stareTime+' SECOND WARNING');sound(isC45?145:115,.65,'sawtooth',.04);return created;
 }
 function startA60Encounter(targetRoom){
  const targetCenter=targetRoom*ROOM_LENGTH+ROOM_LENGTH*.5;
- a60FrameIndex=0;a60FrameTimer=0;a60FrameTrail=[];a60CurrentOffset={x:rand(-.5,.5),y:rand(-.5,.5)};
- entity={type:'A-60',x:0,z:1.2,age:0,phase:'charge',targetRoom,targetZ:targetCenter,speed:A60_SPEED,waitDuration:rand(4,6),ringTime:0,ringTrailTimer:0,ringTrail:[],dustTimer:0,trailTimer:0,dustParticles:[],dustTrail:[]};
- setStatus('A-60 IS CHARGING FROM THE LOBBY — HIDE NOW');
- sound(165,.7,'sawtooth',.045);
+ const created=registerEntity({type:'A-60',x:0,z:1.2,age:0,phase:'charge',targetRoom,targetZ:targetCenter,speed:A60_SPEED,waitDuration:rand(4,6),ringTime:0,ringTrailTimer:0,ringTrail:[],dustTimer:0,trailTimer:0,dustParticles:[],dustTrail:[],frameIndex:0,frameTimer:0,frameTrail:[],currentOffset:{x:rand(-.5,.5),y:rand(-.5,.5)}});
+ if(!created)return null;
+ setStatus('A-60 IS CHARGING FROM THE LOBBY — HIDE NOW');sound(165,.7,'sawtooth',.045);return created;
 }
 function teleportToRoom(targetRoom){
  if(!Number.isInteger(targetRoom)||targetRoom<0||targetRoom>999){setStatus('INVALID ROOM NUMBER');return}
@@ -120,10 +133,11 @@ function teleportToRoom(targetRoom){
 }
 function spawnAdminEntity(){
  const selected=adminEntitySelect.value;
+ if(entities.length>=MAX_ACTIVE_ENTITIES){adminFeedback.textContent='ENTITY LIMIT REACHED — MAX '+MAX_ACTIVE_ENTITIES;return}
  entityCooldown=0;
  if(selected==='A-1'){
   const spawnRoom=Math.max(1,room);
-  entity={type:'A-1',x:0,z:spawnRoom*ROOM_LENGTH+ROOM_LENGTH*.5,age:0,phase:'stare',stareTime:2,speed:ROOM_LENGTH*.58,damaged:false,damageTimer:0,cloneTimer:.08,clones:[]};
+  registerEntity({type:'A-1',x:0,z:spawnRoom*ROOM_LENGTH+ROOM_LENGTH*.5,age:0,phase:'stare',stareTime:2,speed:ROOM_LENGTH*.58,damaged:false,damageTimer:0,cloneTimer:.08,clones:[]});
   setStatus('ADMIN SPAWNED A-1');
   adminFeedback.textContent='A-1 SPAWNS IN ROOM CENTER — 2 SECOND WARNING';
  }else if(selected==='A-25'||selected==='C-25'){
@@ -145,7 +159,7 @@ function spawnAdminEntity(){
   adminFeedback.textContent='UNKNOWN ENTITY';
   return;
  }
- if(entity&&(entity.type==='A-25'||entity.type==='C-25'))a25Started=true;
+ if(selected==='A-25'||selected==='C-25')a25Started=true;
  adminPanel.style.display='none';adminPanel.setAttribute('aria-hidden','true');
  sound(selected==='A-25'?62:selected==='C-25'?92:selected==='A-45'?125:selected==='C-45'?155:selected==='A-60'?165:118,.35,'sawtooth',.028);
 }
@@ -173,15 +187,15 @@ function nearbyDoor(){
 }
 function handleRoomEntered(nextRoomNumber){
  setStatus('ROOM A-'+String(nextRoomNumber).padStart(3,'0')+' ENTERED');
- if(nextRoomNumber===60&&!entity&&Math.random()<.21){startA60Encounter(nextRoomNumber);return}
- if(nextRoomNumber===45&&!entity&&Math.random()<.38){
+ if(nextRoomNumber===60&&countEntities('A-60')===0&&entities.length<MAX_ACTIVE_ENTITIES&&Math.random()<.21){startA60Encounter(nextRoomNumber);return}
+ if(nextRoomNumber===45&&countEntities('A-45')+countEntities('C-45')===0&&entities.length<MAX_ACTIVE_ENTITIES&&Math.random()<.38){
   startA45Encounter(nextRoomNumber,Math.random()<.032?'C-45':'A-45');
   return;
  }
- if(nextRoomNumber>=A25_ROOM&&!entity&&!a25Started&&Math.random()<.32){startA25Encounter(nextRoomNumber);return}
+ if(nextRoomNumber>=A25_ROOM&&countEntities('A-25')+countEntities('C-25')===0&&!a25Started&&entities.length<MAX_ACTIVE_ENTITIES&&Math.random()<.32){startA25Encounter(nextRoomNumber);return}
  const spawnRate=getEntitySpawnRate('A-1');
- if(!entity&&entityCooldown<=0&&Math.random()<spawnRate){
-  entity={type:'A-1',x:0,z:nextRoomNumber*ROOM_LENGTH+ROOM_LENGTH*.5,age:0,phase:'stare',stareTime:2,speed:ROOM_LENGTH*.58,damaged:false,damageTimer:0,cloneTimer:.08,clones:[]};
+ if(countEntities('A-1')<2&&entityCooldown<=0&&entities.length<MAX_ACTIVE_ENTITIES&&Math.random()<spawnRate){
+  registerEntity({type:'A-1',x:0,z:nextRoomNumber*ROOM_LENGTH+ROOM_LENGTH*.5,age:0,phase:'stare',stareTime:2,speed:ROOM_LENGTH*.58,damaged:false,damageTimer:0,cloneTimer:.08,clones:[]});
   setStatus('A-1 IS WATCHING — 2 SECONDS');sound(118,.42,'sawtooth',.018);
  }
 }
@@ -246,7 +260,6 @@ canvas.addEventListener('pointermove',e=>{if(!rightDragging)return;const dx=e.cl
 const stopRightDrag=()=>{rightDragging=false};
 canvas.addEventListener('pointerup',stopRightDrag);canvas.addEventListener('pointercancel',stopRightDrag);
 function update(dt){
- updateA60Frames(dt);
  if(hideExitGrace>0)hideExitGrace=Math.max(0,hideExitGrace-dt);
  for(const state of doorStates.values())state.angle=Math.min(1.35,state.angle+dt*3.4);
  if(!isHiding){
@@ -285,209 +298,219 @@ function update(dt){
  }else if(statusEl.dataset.state!=='hidden'){
   setStatus('HIDDEN — PRESS E TO EXIT');statusEl.dataset.state='hidden';
  }
+ for(let entityIndex=entities.length-1;entityIndex>=0;entityIndex--){
+  entity=entities[entityIndex];
+  updateA60Frames(dt,entity);
  if(entity&&(entity.type==='A-45'||entity.type==='C-45')){
-  const isC45=entity.type==='C-45';
-  entity.age+=dt;
-  for(const particle of entity.particles){particle.age+=dt;particle.z-=dt*.85}
-  entity.particles=entity.particles.filter(particle=>particle.age<particle.life);
-  if(entity.phase==='stare'){
-   if(entity.age>=entity.stareTime){
-    entity.phase='charge';entity.age=0;entity.particleTimer=0;
-    setStatus(entity.type+' CHARGING — HIDE NOW');
-    sound(isC45?175:135,.42,'sawtooth',isC45 ? .055 : .04);
-   }
-  }else if(entity.phase==='charge'){
-   entity.particleTimer-=dt;
-   if(entity.particleTimer<=0){
-    entity.particles.push({x:entity.x+rand(-.9,.9),z:entity.z-rand(.2,1.35),height:rand(.25,3.15),age:0,life:rand(1,1.4),scale:rand(.9,1.45)});
-    if(entity.particles.length>42)entity.particles.shift();
-    entity.particleTimer=isC45 ? .035 : .05;
-   }
-   entity.z+=entity.speed*dt;
-   if(entity.z>=entity.targetZ){
-    entity.z=entity.targetZ;
-    entity.phase='fade';
-    entity.age=0;
-    setStatus(entity.type+' PASSED — FADING OUT');
-   }
-  }else if(entity.phase==='fade'){
+   const isC45=entity.type==='C-45';
    entity.age+=dt;
-   if(entity.age>=1.25){
-    const passedType=entity.type;
-    entity=null;
-    setStatus(passedType+' PASSED — ENCOUNTER CLEARED');
-   }
-  }
-  if(entity&&entity.phase==='charge'){
-   const distance=Math.hypot(entity.x-player.x,entity.z-player.z);
-   const radius=isC45?C45_DAMAGE_RADIUS:A45_DAMAGE_RADIUS;
-   if(distance<=radius){
-    const intensity=isC45?54:34;
-    shake=Math.max(shake,(1-distance/radius)*intensity+2);
-    if(!isHiding&&!godMode){
-     dead=true;running=false;health=0;updateHud();setStatus('LOST');
-     showOverlay(entity.type+' FOUND YOU','Stay hidden until the entity has passed.','TRY AGAIN','GAME OVER');return;
+   for(const particle of entity.particles){particle.age+=dt;particle.z-=dt*.85}
+   entity.particles=entity.particles.filter(particle=>particle.age<particle.life);
+   if(entity.phase==='stare'){
+    if(entity.age>=entity.stareTime){
+     entity.phase='charge';entity.age=0;entity.particleTimer=0;
+     setStatus(entity.type+' CHARGING — HIDE NOW');
+     sound(isC45?175:135,.42,'sawtooth',isC45 ? .055 : .04);
     }
-   }
-  }}else if(entity&&entity.type==='A-60'){
-   entity.ringTime+=dt;
-   const previousZ=entity.z,previousX=entity.x;
-   entity.dustTimer-=dt;
-   entity.trailTimer-=dt;
-   entity.ringTrailTimer-=dt;
-   for(const ring of entity.ringTrail)ring.age+=dt;
-   entity.ringTrail=entity.ringTrail.filter(ring=>ring.age<ring.life);
-   if(entity.phase==='charge'){
-    entity.z=Math.min(entity.targetZ,entity.z+entity.speed*dt);
-    if(entity.trailTimer<=0){
-     entity.dustTrail.push({x:entity.x+rand(-.18,.18),z:entity.z+rand(.1,.65),age:0,life:rand(.48,.82),size:rand(3.2,5.4)});
-     if(entity.dustTrail.length>24)entity.dustTrail.shift();
-     entity.trailTimer=.045;
+   }else if(entity.phase==='charge'){
+    entity.particleTimer-=dt;
+    if(entity.particleTimer<=0){
+     entity.particles.push({x:entity.x+rand(-.9,.9),z:entity.z-rand(.2,1.35),height:rand(.25,3.15),age:0,life:rand(1,1.4),scale:rand(.9,1.45)});
+     if(entity.particles.length>42)entity.particles.shift();
+     entity.particleTimer=isC45 ? .035 : .05;
     }
-    if(entity.ringTrailTimer<=0&&entity.z>previousZ){
-     entity.ringTrail.push({x:entity.x,z:previousZ,angle:-entity.ringTime*10.5,age:0,life:1.1});
-     if(entity.ringTrail.length>7)entity.ringTrail.shift();
-     entity.ringTrailTimer=.12;
-    }
+    entity.z+=entity.speed*dt;
     if(entity.z>=entity.targetZ){
-     entity.phase='wait';
-     entity.age=0;
-     setStatus('A-60 IS WAITING IN THE MIDDLE OF ROOM A-'+String(entity.targetRoom).padStart(3,'0'));
-    }
-   }else if(entity.phase==='wait'){
-    entity.age+=dt;
-    if(entity.age>=entity.waitDuration){
+     entity.z=entity.targetZ;
      entity.phase='fade';
      entity.age=0;
-     setStatus('A-60 IS FADING OUT');
+     setStatus(entity.type+' PASSED — FADING OUT');
     }
    }else if(entity.phase==='fade'){
     entity.age+=dt;
     if(entity.age>=1.25){
+     const passedType=entity.type;
      entity=null;
-     a60FrameTrail=[];
-     a60FrameIndex=0;
-     a60FrameTimer=0;
-     a60CurrentOffset={x:0,y:0};
-     setStatus('A-60 DESPAWNED');
+     setStatus(passedType+' PASSED — ENCOUNTER CLEARED');
     }
    }
-   if(entity){
-    const movedZ=entity.z-previousZ,movedX=entity.x-previousX;
-    for(const particle of entity.dustParticles){
-     particle.age+=dt;
-     particle.x+=movedX+particle.vx*dt;
-     particle.z+=movedZ+particle.vz*dt;
-     particle.height+=particle.vh*dt;
-    }
-    entity.dustParticles=entity.dustParticles.filter(particle=>particle.age<particle.life);
-    for(const trail of entity.dustTrail)trail.age+=dt;
-    entity.dustTrail=entity.dustTrail.filter(trail=>trail.age<trail.life);
-    if(entity.phase!=='fade'&&entity.dustTimer<=0){
-     for(let i=0;i<4;i++){
-      entity.dustParticles.push({
-       x:entity.x+rand(-1.65,1.65),
-       z:entity.z+rand(-.9,.9),
-       height:rand(.18,4.65),
-       size:rand(1.9,3.6),
-       vx:rand(-.22,.22),
-       vz:rand(-.2,.2),
-       vh:rand(-.12,.12),
-       age:0,
-       life:rand(.28,.62)
-      });
+   if(entity&&entity.phase==='charge'){
+    const distance=Math.hypot(entity.x-player.x,entity.z-player.z);
+    const radius=isC45?C45_DAMAGE_RADIUS:A45_DAMAGE_RADIUS;
+    if(distance<=radius){
+     const intensity=isC45?54:34;
+     shake=Math.max(shake,(1-distance/radius)*intensity+2);
+     if(!isHiding&&!godMode){
+      dead=true;running=false;health=0;updateHud();setStatus('LOST');
+      showOverlay(entity.type+' FOUND YOU','Stay hidden until the entity has passed.','TRY AGAIN','GAME OVER');return;
      }
-     if(entity.dustParticles.length>84)entity.dustParticles.splice(0,entity.dustParticles.length-84);
-     entity.dustTimer=.055;
     }
+   }}else if(entity&&entity.type==='A-60'){
+    entity.ringTime+=dt;
+    const previousZ=entity.z,previousX=entity.x;
+    entity.dustTimer-=dt;
+    entity.trailTimer-=dt;
+    entity.ringTrailTimer-=dt;
+    for(const ring of entity.ringTrail)ring.age+=dt;
+    entity.ringTrail=entity.ringTrail.filter(ring=>ring.age<ring.life);
     if(entity.phase==='charge'){
-     const distance=Math.hypot(entity.x-player.x,entity.z-player.z);
-     if(distance<=A60_DAMAGE_RADIUS){
-      shake=Math.max(shake,(1-distance/A60_DAMAGE_RADIUS)*52+3);
-      if(!isHiding&&!godMode){
-       dead=true;running=false;health=0;updateHud();setStatus('LOST');
-       showOverlay('A-60 FOUND YOU','Stay hidden until A-60 has passed.','TRY AGAIN','GAME OVER');return;
+     entity.z=Math.min(entity.targetZ,entity.z+entity.speed*dt);
+     if(entity.trailTimer<=0){
+      entity.dustTrail.push({x:entity.x+rand(-.18,.18),z:entity.z+rand(.1,.65),age:0,life:rand(.48,.82),size:rand(3.2,5.4)});
+      if(entity.dustTrail.length>24)entity.dustTrail.shift();
+      entity.trailTimer=.045;
+     }
+     if(entity.ringTrailTimer<=0&&entity.z>previousZ){
+      entity.ringTrail.push({x:entity.x,z:previousZ,angle:-entity.ringTime*10.5,age:0,life:1.1});
+      if(entity.ringTrail.length>7)entity.ringTrail.shift();
+      entity.ringTrailTimer=.12;
+     }
+     if(entity.z>=entity.targetZ){
+      entity.phase='wait';
+      entity.age=0;
+      setStatus('A-60 IS WAITING IN THE MIDDLE OF ROOM A-'+String(entity.targetRoom).padStart(3,'0'));
+     }
+    }else if(entity.phase==='wait'){
+     entity.age+=dt;
+     if(entity.age>=entity.waitDuration){
+      entity.phase='fade';
+      entity.age=0;
+      setStatus('A-60 IS FADING OUT');
+     }
+    }else if(entity.phase==='fade'){
+     entity.age+=dt;
+     if(entity.age>=1.25){
+      entity.frameTrail=[];
+      entity.frameIndex=0;
+      entity.frameTimer=0;
+      entity.currentOffset={x:0,y:0};
+      entity=null;
+      setStatus('A-60 DESPAWNED');
+     }
+    }
+    if(entity){
+     const movedZ=entity.z-previousZ,movedX=entity.x-previousX;
+     for(const particle of entity.dustParticles){
+      particle.age+=dt;
+      particle.x+=movedX+particle.vx*dt;
+      particle.z+=movedZ+particle.vz*dt;
+      particle.height+=particle.vh*dt;
+     }
+     entity.dustParticles=entity.dustParticles.filter(particle=>particle.age<particle.life);
+     for(const trail of entity.dustTrail)trail.age+=dt;
+     entity.dustTrail=entity.dustTrail.filter(trail=>trail.age<trail.life);
+     if(entity.phase!=='fade'&&entity.dustTimer<=0){
+      for(let i=0;i<4;i++){
+       entity.dustParticles.push({
+        x:entity.x+rand(-1.65,1.65),
+        z:entity.z+rand(-.9,.9),
+        height:rand(.18,4.65),
+        size:rand(1.9,3.6),
+        vx:rand(-.22,.22),
+        vz:rand(-.2,.2),
+        vh:rand(-.12,.12),
+        age:0,
+        life:rand(.28,.62)
+       });
+      }
+      if(entity.dustParticles.length>84)entity.dustParticles.splice(0,entity.dustParticles.length-84);
+      entity.dustTimer=.055;
+     }
+     if(entity.phase==='charge'){
+      const distance=Math.hypot(entity.x-player.x,entity.z-player.z);
+      if(distance<=A60_DAMAGE_RADIUS){
+       shake=Math.max(shake,(1-distance/A60_DAMAGE_RADIUS)*52+3);
+       if(!isHiding&&!godMode){
+        dead=true;running=false;health=0;updateHud();setStatus('LOST');
+        showOverlay('A-60 FOUND YOU','Stay hidden until A-60 has passed.','TRY AGAIN','GAME OVER');return;
+       }
       }
      }
     }
-   }
-  }else if(entity){
-  if(entity.type==='A-25'||entity.type==='C-25'){
-   entity.age+=dt;
-   entity.particleTimer-=dt;
-   if(entity.particleTimer<=0){
-    entity.particles.push({x:entity.x+rand(-1.15,1.15),z:entity.z-entity.direction*rand(.2,1.7),height:rand(.2,3.35),age:0,life:rand(.9,1.35),scale:rand(.65,1.05),variant:Math.floor(Math.random()*2),frame:Math.floor(Math.random()*16)});
-    if(entity.particles.length>48)entity.particles.shift();
-    entity.particleTimer=.07;
-   }
-   for(const particle of entity.particles){particle.age+=dt;particle.z-=entity.direction*dt*.75}
-   entity.particles=entity.particles.filter(particle=>particle.age<particle.life);
-   entity.z+=entity.direction*entity.speed*dt;
-   if(entity.direction>0&&entity.z>=entity.targetZ){
-    entity.z=entity.targetZ;
-    if(entity.type==='C-25'){
-     if(entity.rebounds>=entity.reboundLimit){entity=null;a25Completed=true;a25Started=false;setStatus('C-25 PASSED — ENCOUNTER CLEARED')}
-     else{entity.rebounds++;entity.direction=-1;entity.targetZ=.8;setStatus('C-25 REBOUND '+entity.rebounds+'/5 — RETURNING TO LOBBY')}
-    }else if(entity.rebounds===0){
-     entity.rebounds=1;entity.direction=-1;entity.targetZ=.8;
-     setStatus('A-25 REBOUNDS — RUNNING BACK TO THE LOBBY');
-    }else if(entity.rebounds===2){
-     entity=null;a25Completed=true;a25Started=false;setStatus('A-25 PASSED — ROOM CLEARED');
+   }else if(entity){
+   if(entity.type==='A-25'||entity.type==='C-25'){
+    entity.age+=dt;
+    entity.particleTimer-=dt;
+    if(entity.particleTimer<=0){
+     entity.particles.push({x:entity.x+rand(-1.15,1.15),z:entity.z-entity.direction*rand(.2,1.7),height:rand(.2,3.35),age:0,life:rand(.9,1.35),scale:rand(.65,1.05),variant:Math.floor(Math.random()*2),frame:Math.floor(Math.random()*16)});
+     if(entity.particles.length>48)entity.particles.shift();
+     entity.particleTimer=.07;
     }
-   }else if(entity.direction<0&&entity.z<=entity.targetZ){
-    entity.z=entity.targetZ;
-    if(entity.type==='C-25'){
-     if(entity.rebounds>=entity.reboundLimit){entity=null;a25Completed=true;a25Started=false;setStatus('C-25 PASSED — ENCOUNTER CLEARED')}
-     else{entity.rebounds++;entity.direction=1;entity.targetZ=(entity.targetRoom+1)*ROOM_LENGTH-.8;setStatus('C-25 REBOUND '+entity.rebounds+'/5 — CHARGING TO THE DOOR')}
+    for(const particle of entity.particles){particle.age+=dt;particle.z-=entity.direction*dt*.75}
+    entity.particles=entity.particles.filter(particle=>particle.age<particle.life);
+    entity.z+=entity.direction*entity.speed*dt;
+    if(entity.direction>0&&entity.z>=entity.targetZ){
+     entity.z=entity.targetZ;
+     if(entity.type==='C-25'){
+      if(entity.rebounds>=entity.reboundLimit){entity=null;a25Completed=true;a25Started=false;setStatus('C-25 PASSED — ENCOUNTER CLEARED')}
+      else{entity.rebounds++;entity.direction=-1;entity.targetZ=.8;setStatus('C-25 REBOUND '+entity.rebounds+'/5 — RETURNING TO LOBBY')}
+     }else if(entity.rebounds===0){
+      entity.rebounds=1;entity.direction=-1;entity.targetZ=.8;
+      setStatus('A-25 REBOUNDS — RUNNING BACK TO THE LOBBY');
+     }else if(entity.rebounds===2){
+      entity=null;a25Completed=true;a25Started=false;setStatus('A-25 PASSED — ROOM CLEARED');
+     }
+    }else if(entity.direction<0&&entity.z<=entity.targetZ){
+     entity.z=entity.targetZ;
+     if(entity.type==='C-25'){
+      if(entity.rebounds>=entity.reboundLimit){entity=null;a25Completed=true;a25Started=false;setStatus('C-25 PASSED — ENCOUNTER CLEARED')}
+      else{entity.rebounds++;entity.direction=1;entity.targetZ=(entity.targetRoom+1)*ROOM_LENGTH-.8;setStatus('C-25 REBOUND '+entity.rebounds+'/5 — CHARGING TO THE DOOR')}
+     }else{
+      entity.rebounds=2;
+      entity.direction=1;entity.targetZ=(entity.targetRoom+1)*ROOM_LENGTH-.8;
+      setStatus('A-25 REBOUNDS AT THE LOBBY — FINAL PASS');
+     }
+    }
+    if(entity&&!isHiding&&!godMode&&hideExitGrace<=0&&Math.hypot(entity.x-player.x,entity.z-player.z)<=A25_DAMAGE_RADIUS){
+     dead=true;running=false;health=0;updateHud();setStatus('LOST');
+     showOverlay(entity.type+' FOUND YOU','Stay hidden until the entity has passed.','TRY AGAIN','GAME OVER');return;
+    }
+    if(entity){
+     const distance=Math.hypot(entity.x-player.x,entity.z-player.z);
+     if(distance<=A25_DAMAGE_RADIUS){
+      const intensity=entity.type==='C-25'?42:22;
+      shake=Math.max(shake,(1-distance/A25_DAMAGE_RADIUS)*intensity+1.5);
+      if(!isHiding)setStatus(entity.type+' NEAR — HIDE NOW');
+     }
+    }
+   }else{
+    entity.age+=dt;
+    const auraDistance=Math.hypot(entity.x-player.x,entity.z-player.z);
+    if(!godMode&&!isHiding&&auraDistance<=A1_DAMAGE_RADIUS){
+     entity.damageTimer-=dt;
+     if(entity.damageTimer<=0){
+      health=Math.max(0,health-A1_DAMAGE_PER_TICK);shake=8;sound(95,.12,'sawtooth',.025);updateHud();
+      entity.damageTimer=A1_DAMAGE_INTERVAL;
+      if(health<=0){dead=true;running=false;setStatus('LOST');showOverlay('YOU WERE FOUND','A-1 drained your health in room A-'+String(room).padStart(3,'0')+'.','TRY AGAIN','GAME OVER');return}
+     }
     }else{
-     entity.rebounds=2;
-     entity.direction=1;entity.targetZ=(entity.targetRoom+1)*ROOM_LENGTH-.8;
-     setStatus('A-25 REBOUNDS AT THE LOBBY — FINAL PASS');
+     entity.damageTimer=0;
     }
-   }
-   if(entity&&!isHiding&&!godMode&&hideExitGrace<=0&&Math.hypot(entity.x-player.x,entity.z-player.z)<=A25_DAMAGE_RADIUS){
-    dead=true;running=false;health=0;updateHud();setStatus('LOST');
-    showOverlay(entity.type+' FOUND YOU','Stay hidden until the entity has passed.','TRY AGAIN','GAME OVER');return;
-   }
-   if(entity){
-    const distance=Math.hypot(entity.x-player.x,entity.z-player.z);
-    if(distance<=A25_DAMAGE_RADIUS){
-     const intensity=entity.type==='C-25'?42:22;
-     shake=Math.max(shake,(1-distance/A25_DAMAGE_RADIUS)*intensity+1.5);
-     if(!isHiding)setStatus(entity.type+' NEAR — HIDE NOW');
+    if(entity.phase==='stare'){
+     if(entity.age>=entity.stareTime){entity.phase='run';entity.age=0;entity.cloneTimer=0;setStatus(isHiding?'HIDDEN — A-1 PASSING':'A-1 IS RUNNING');sound(82,.35,'sawtooth',.028)}
+    }else{
+     entity.z-=entity.speed*dt;
+     entity.cloneTimer-=dt;
+     if(entity.cloneTimer<=0&&entity.z-player.z<48&&entity.z-player.z>1.5){
+      if(entity.clones.length<5)entity.clones.push({x:entity.x+rand(-.14,.14),z:entity.z+rand(.05,.55),age:0,lift:0,scale:rand(.72,.94)});
+      entity.cloneTimer=.3;
+     }
+     for(let index=entity.clones.length-1;index>=0;index--){
+      const clone=entity.clones[index];
+      clone.age+=dt;clone.lift=Math.min(2.1,clone.lift+dt*1.8);
+      if(clone.age>=.95)entity.clones.splice(index,1);
+     }
+     if(entity.z<=.8){entity=null;entityCooldown=10;setStatus(isHiding?'HIDDEN':'A-1 RETURNED TO LOBBY')}
     }
-   }
-  }else{
-   entity.age+=dt;
-   const auraDistance=Math.hypot(entity.x-player.x,entity.z-player.z);
-   if(!godMode&&!isHiding&&auraDistance<=A1_DAMAGE_RADIUS){
-    entity.damageTimer-=dt;
-    if(entity.damageTimer<=0){
-     health=Math.max(0,health-A1_DAMAGE_PER_TICK);shake=8;sound(95,.12,'sawtooth',.025);updateHud();
-     entity.damageTimer=A1_DAMAGE_INTERVAL;
-     if(health<=0){dead=true;running=false;setStatus('LOST');showOverlay('YOU WERE FOUND','A-1 drained your health in room A-'+String(room).padStart(3,'0')+'.','TRY AGAIN','GAME OVER');return}
-    }
-   }else{
-    entity.damageTimer=0;
-   }
-   if(entity.phase==='stare'){
-    if(entity.age>=entity.stareTime){entity.phase='run';entity.age=0;entity.cloneTimer=0;setStatus(isHiding?'HIDDEN — A-1 PASSING':'A-1 IS RUNNING');sound(82,.35,'sawtooth',.028)}
-   }else{
-    entity.z-=entity.speed*dt;
-    entity.cloneTimer-=dt;
-    if(entity.cloneTimer<=0&&entity.z-player.z<48&&entity.z-player.z>1.5){
-     if(entity.clones.length<5)entity.clones.push({x:entity.x+rand(-.14,.14),z:entity.z+rand(.05,.55),age:0,lift:0,scale:rand(.72,.94)});
-     entity.cloneTimer=.3;
-    }
-    for(let index=entity.clones.length-1;index>=0;index--){
-     const clone=entity.clones[index];
-     clone.age+=dt;clone.lift=Math.min(2.1,clone.lift+dt*1.8);
-     if(clone.age>=.95)entity.clones.splice(index,1);
-    }
-    if(entity.z<=.8){entity=null;entityCooldown=10;setStatus(isHiding?'HIDDEN':'A-1 RETURNED TO LOBBY')}
    }
   }
+  if(entity===null){
+   entities.splice(entityIndex,1);
+   a25Started=entities.some(item=>item.type==='A-25'||item.type==='C-25');
+  }else updateEntityPhysics(entity);
+  if(dead){entity=null;return}
  }
+ entity=entities.length?entities[entities.length-1]:null;
  if(entityCooldown>0)entityCooldown-=dt;
 }
 function cameraSpace(wx,wz,height){
@@ -559,24 +582,29 @@ const ENTITY_SPAWN_RATES=Object.freeze({'A-1':0.20});
 function paletteAt(z){return ROOM_MATERIAL}
 function getEntitySpawnRate(entityId){return ENTITY_SPAWN_RATES[entityId]??0}
 function drawFloor(){
- const near=retainedRoomFloor()*ROOM_LENGTH,far=player.z+48,boardWidth=.85,boardLength=8;
- for(let z=Math.floor(far/boardLength)*boardLength;z>=Math.floor(near/boardLength)*boardLength;z-=boardLength){
-  const half=halfWidthAt(z);
-  for(let x=-half;x<half;x+=boardWidth){
-   const right=Math.min(half,x+boardWidth);
-   const vertices=[[x,z,0],[right,z,0],[right,z+boardLength,0],[x,z+boardLength,0]];
-   const index=(Math.floor((x+half)/boardWidth)+Math.floor(z/boardLength))%ROOM_MATERIAL.floor.length;
-   worldPolygon(vertices,ROOM_MATERIAL.floor[index]);
-   worldLine([x+.12,z+1.5,0],[x+.12,z+boardLength-1,0],'#d4dfcc22',1);
-   worldLine([right,z,0],[right,z+boardLength,0],ROOM_MATERIAL.floorSeam,1,.65);
+ const boardWidth=.85,boardLength=8;
+ for(const range of activeRoomRanges()){
+  const near=range.start*ROOM_LENGTH,far=(range.end+1)*ROOM_LENGTH;
+  for(let z=Math.floor(far/boardLength)*boardLength;z>=Math.floor(near/boardLength)*boardLength;z-=boardLength){
+   const half=halfWidthAt(z);
+   for(let x=-half;x<half;x+=boardWidth){
+    const right=Math.min(half,x+boardWidth);
+    const vertices=[[x,z,0],[right,z,0],[right,z+boardLength,0],[x,z+boardLength,0]];
+    const index=(Math.floor((x+half)/boardWidth)+Math.floor(z/boardLength))%ROOM_MATERIAL.floor.length;
+    worldPolygon(vertices,ROOM_MATERIAL.floor[index]);
+    worldLine([x+.12,z+1.5,0],[x+.12,z+boardLength-1,0],'#d4dfcc22',1);
+    worldLine([right,z,0],[right,z+boardLength,0],ROOM_MATERIAL.floorSeam,1,.65);
+   }
   }
  }
 }
 function drawCeiling(){
- const near=retainedRoomFloor()*ROOM_LENGTH,far=player.z+42;
- for(let z=Math.floor(far/3)*3;z>=Math.floor(near/3)*3;z-=3){
-  const half=halfWidthAt(z);
-  worldPolygon([[-half,z,3.55],[half,z,3.55],[half,z+3,3.55],[-half,z+3,3.55]],ROOM_MATERIAL.ceiling[Math.floor(z/3)%ROOM_MATERIAL.ceiling.length]);
+ for(const range of activeRoomRanges()){
+  const near=range.start*ROOM_LENGTH,far=(range.end+1)*ROOM_LENGTH;
+  for(let z=Math.floor(far/3)*3;z>=Math.floor(near/3)*3;z-=3){
+   const half=halfWidthAt(z);
+   worldPolygon([[-half,z,3.55],[half,z,3.55],[half,z+3,3.55],[-half,z+3,3.55]],ROOM_MATERIAL.ceiling[Math.floor(z/3)%ROOM_MATERIAL.ceiling.length]);
+  }
  }
 }
 function drawSideWallSegment(z,side){
@@ -726,32 +754,33 @@ function drawEndDoor(){
  drawDoorway(boundary,room+1,-1);
 }
 function drawSceneObjects(){
- const items=[];
- const wallStart=Math.floor(retainedRoomFloor()*ROOM_LENGTH/2)*2;
- const wallEnd=Math.floor((player.z+42)/2)*2;
- for(let z=wallStart;z<=wallEnd;z+=2){
-  for(const side of [-1,1]){
-   const x=side*halfWidthAt(z+1);
-   items.push({depth:cameraSpace(x,z+1,1.75).forward,draw:()=>drawSideWallSegment(z,side)});
+ const items=[],renderedDoors=new Set();
+ for(const range of activeRoomRanges()){
+  const wallStart=Math.floor(range.start*ROOM_LENGTH/2)*2,wallEnd=Math.floor((range.end+1)*ROOM_LENGTH/2)*2;
+  for(let z=wallStart;z<=wallEnd;z+=2){
+   for(const side of [-1,1]){
+    const x=side*halfWidthAt(z+1);
+    items.push({depth:cameraSpace(x,z+1,1.75).forward,draw:()=>drawSideWallSegment(z,side)});
+   }
+  }
+  for(let n=range.start;n<=range.end;n++){
+   const closet=closetForRoom(n);
+   items.push({depth:cameraSpace(closet.x,closet.z,1.15).forward,draw:()=>drawCloset(closet)});
+   for(let slot=0;slot<2;slot++){
+    const desk=deskForRoom(n,slot);
+    items.push({depth:cameraSpace(desk.x,desk.z,.8).forward,draw:()=>drawDesk(desk)});
+   }
+   const boundary=(n+1)*ROOM_LENGTH;
+   if(!renderedDoors.has(boundary)){
+    renderedDoors.add(boundary);
+    items.push({depth:cameraSpace(0,boundary,1.6).forward,draw:()=>drawDoorway(boundary,n+1,-1)});
+   }
   }
  }
- for(let n=retainedRoomFloor();n<=room+1;n++){
-  const closet=closetForRoom(n);
-  items.push({depth:cameraSpace(closet.x,closet.z,1.15).forward,draw:()=>drawCloset(closet)});
-  for(let slot=0;slot<2;slot++){
-   const desk=deskForRoom(n,slot);
-   items.push({depth:cameraSpace(desk.x,desk.z,.8).forward,draw:()=>drawDesk(desk)});
-  }
- }
- if(entity)items.push({depth:cameraSpace(entity.x,entity.z,1.6).forward,draw:drawEntity});
- if(room>0){
-  const boundary=room*ROOM_LENGTH;
-  items.push({depth:cameraSpace(0,boundary,1.6).forward,draw:drawPreviousDoor});
- }
- const nextBoundary=(room+1)*ROOM_LENGTH;
- items.push({depth:cameraSpace(0,nextBoundary,1.6).forward,draw:drawEndDoor});
+ for(const instance of entities)items.push({depth:cameraSpace(instance.x,instance.z,1.6).forward,draw:()=>{entity=instance;drawEntity()}});
  items.sort((a,b)=>b.depth-a.depth);
  for(const item of items)item.draw();
+ entity=null;
 }
 
 let a1LabelCanvas=null;
@@ -786,16 +815,15 @@ const a60Frames=Array.from({length:7},(_,index)=>{
  return frame;
 });
 const A60_FRAME_DURATION=.075;
-let a60FrameIndex=0,a60FrameTimer=0,a60FrameTrail=[],a60CurrentOffset={x:0,y:0};
-function updateA60Frames(dt){
- if(!entity||entity.type!=='A-60')return;
- a60FrameTimer+=dt;
- while(a60FrameTimer>=A60_FRAME_DURATION){
-  a60FrameTimer-=A60_FRAME_DURATION;
-  a60FrameTrail.push({index:a60FrameIndex,x:a60CurrentOffset.x,y:a60CurrentOffset.y});
-  if(a60FrameTrail.length>3)a60FrameTrail.shift();
-  a60FrameIndex=(a60FrameIndex+1)%a60Frames.length;
-  a60CurrentOffset={x:rand(-.5,.5),y:rand(-.5,.5)};
+function updateA60Frames(dt,item){
+ if(!item||item.type!=='A-60')return;
+ item.frameTimer+=dt;
+ while(item.frameTimer>=A60_FRAME_DURATION){
+  item.frameTimer-=A60_FRAME_DURATION;
+  item.frameTrail.push({index:item.frameIndex,x:item.currentOffset.x,y:item.currentOffset.y});
+  if(item.frameTrail.length>3)item.frameTrail.shift();
+  item.frameIndex=(item.frameIndex+1)%a60Frames.length;
+  item.currentOffset={x:rand(-.5,.5),y:rand(-.5,.5)};
  }
 }
 function drawA1SpriteAt(worldX,worldZ,height,alpha,baseHeight=0,glow=true){
@@ -932,7 +960,7 @@ function drawA60(){
  const visualHeight=4.8;
  const base=project(entity.x,entity.z,0),top=project(entity.x,entity.z,visualHeight);
  if(!base||!top||base.x<-620||base.x>W+620)return;
- const h=clamp(Math.abs(base.y-top.y),2,720),frame=a60Frames[a60FrameIndex];
+ const h=clamp(Math.abs(base.y-top.y),2,720),frame=a60Frames[entity.frameIndex];
  const aspect=frame&&frame.naturalWidth&&frame.naturalHeight?frame.naturalWidth/frame.naturalHeight:1;
  const w=clamp(h*aspect,2,900);
  if(h<2||w<2||!Number.isFinite(h+w))return;
@@ -1015,11 +1043,11 @@ function drawA60(){
  };
 
  const trailAlphas=[.18,.3,.46];
- for(let i=0;i<a60FrameTrail.length;i++){
-  const trail=a60FrameTrail[i];
+ for(let i=0;i<entity.frameTrail.length;i++){
+  const trail=entity.frameTrail[i];
   drawFrame(trail.index,trail.x,trail.y,trailAlphas[i]||.18);
  }
- drawFrame(a60FrameIndex,a60CurrentOffset.x,a60CurrentOffset.y,1);
+ drawFrame(entity.frameIndex,entity.currentOffset.x,entity.currentOffset.y,1);
 }
 function drawA1(){
  if(!entity||entity.type!=='A-1')return;
@@ -1059,7 +1087,7 @@ function draw(){
  const darkness=ctx.createRadialGradient(W/2,H*.58,35,W/2,H*.58,flashlight?410:225);
  darkness.addColorStop(0,'rgba(0,0,0,0)');darkness.addColorStop(.62,'rgba(0,0,0,.18)');darkness.addColorStop(1,flashlight?'rgba(0,0,0,.68)':'rgba(0,0,0,.94)');
  ctx.fillStyle=darkness;ctx.fillRect(0,0,W,H);ctx.restore();
- if(entity&&entity.type==='A-1'&&entity.phase==='stare')drawPixelCanvasText('A-1',W/2,H-55,'700 13px Arial,Helvetica,sans-serif','#c2b88d','center');
+ if(entities.some(item=>item.type==='A-1'&&item.phase==='stare'))drawPixelCanvasText('A-1',W/2,H-55,'700 13px Arial,Helvetica,sans-serif','#c2b88d','center');
 }
 function loop(t){
  if(!running||paused||dead)return;
