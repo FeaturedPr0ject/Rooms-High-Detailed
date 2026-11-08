@@ -648,16 +648,16 @@ function drawDesks(){
  }
 }
 function closetForRoom(roomNumber){
- const z=roomNumber*ROOM_LENGTH+11.5;
+ const z=roomNumber*ROOM_LENGTH+11;
  const side=roomNumber%2===0?-1:1;
  const half=halfWidthAt(z);
- return {room:roomNumber,type:'gray-cabinet',z,x:side*(half-.14),side};
+ return {room:roomNumber,type:'gray-cabinet',z,x:side*(half-.75),side};
 }
 function blueCabinetForRoom(roomNumber){
- const z=roomNumber*ROOM_LENGTH+6.5;
+ const z=roomNumber*ROOM_LENGTH+7;
  const side=roomNumber%2===0?1:-1;
  const half=halfWidthAt(z);
- return {room:roomNumber,type:'blue-cabinet',z,x:side*(half-.14),side};
+ return {room:roomNumber,type:'blue-cabinet',z,x:side*(half-.75),side};
 }
 function findNearbyCloset(){
  let closest=null,best=Infinity;
@@ -935,9 +935,9 @@ function drawSceneObjects(){
   }
   for(let n=range.start;n<=range.end;n++){
    const grayCabinet=closetForRoom(n);
-   items.push({depth:cameraSpace(grayCabinet.x,grayCabinet.z,1.15).forward,draw:()=>drawGrayCloset(grayCabinet)});
+   items.push({depth:cameraSpace(grayCabinet.x-grayCabinet.side*.28,grayCabinet.z,1.2).forward,draw:()=>drawGrayCloset(grayCabinet)});
    const blueCabinet=blueCabinetForRoom(n);
-   items.push({depth:cameraSpace(blueCabinet.x,blueCabinet.z,1.15).forward,draw:()=>drawBlueCabinet(blueCabinet)});
+   items.push({depth:cameraSpace(blueCabinet.x-blueCabinet.side*.28,blueCabinet.z,1.2).forward,draw:()=>drawBlueCabinet(blueCabinet)});
    for(let slot=0;slot<2;slot++){
     const desk=deskForRoom(n,slot);
     items.push({depth:cameraSpace(desk.x,desk.z,.8).forward,draw:()=>drawDesk(desk)});
