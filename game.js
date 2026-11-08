@@ -3,7 +3,7 @@ const canvas=document.getElementById('game');
 const ctx=canvas.getContext('2d');
 const W=960,H=540,HORIZON=220,FOCAL=430,CAMERA_HEIGHT=1.48,ROOM_LENGTH=32,CORRIDOR_HALF=4.2;
 const A1_DAMAGE_RADIUS=4,A1_DAMAGE_PER_TICK=10,A1_DAMAGE_INTERVAL=1,NEAR_CLIP=.48;
-const A25_ROOM=25,A25_SPEED=24,C25_SPEED=40,A45_SPEED=64.4,C45_SPEED=114.8,A25_DAMAGE_RADIUS=10,A45_DAMAGE_RADIUS=8,C45_DAMAGE_RADIUS=8,C25_SPAWN_CHANCE=.012,ROOMS_KEPT_BEHIND=2;
+const A25_ROOM=25,A25_SPEED=24,C25_SPEED=40,A45_SPEED=64.4,C45_SPEED=114.8,A60_SPEED=103.32,A25_DAMAGE_RADIUS=10,A45_DAMAGE_RADIUS=8,C45_DAMAGE_RADIUS=8,C25_SPAWN_CHANCE=.012,ROOMS_KEPT_BEHIND=2;
 const roomLabel=document.getElementById('room-label'),roomCtx=roomLabel.getContext('2d');
 const statusEl=document.getElementById('status'),healthWrap=document.getElementById('health-wrap'),healthFill=document.getElementById('health-fill');
 const overlay=document.getElementById('overlay'),overlayTitle=document.getElementById('overlay-title'),overlayCopy=document.getElementById('overlay-copy'),overlayEyebrow=document.getElementById('overlay-eyebrow'),resumeBtn=document.getElementById('resume'),muteBtn=document.getElementById('mute'),pauseBtn=document.getElementById('pause');
@@ -104,6 +104,12 @@ function startA45Encounter(targetRoom,type){
  setStatus(type+' WAITING IN THE LOBBY — '+stareTime+' SECOND WARNING');
  sound(isC45?145:115,.65,'sawtooth',.04);
 }
+function startA60Encounter(targetRoom){
+ const targetCenter=targetRoom*ROOM_LENGTH+ROOM_LENGTH*.5;
+ entity={type:'A-60',x:0,z:1.2,age:0,phase:'charge',targetRoom,targetZ:targetCenter,speed:A60_SPEED,waitDuration:rand(4,6)};
+ setStatus('A-60 IS CHARGING FROM THE LOBBY — HIDE NOW');
+ sound(165,.7,'sawtooth',.045);
+}
 function teleportToRoom(targetRoom){
  if(!Number.isInteger(targetRoom)||targetRoom<0||targetRoom>999){setStatus('INVALID ROOM NUMBER');return}
  room=targetRoom;furthestRoom=targetRoom;doorStates.clear();player.x=0;player.z=room*ROOM_LENGTH+1.1;player.yaw=0;
@@ -129,13 +135,18 @@ function spawnAdminEntity(){
   startA45Encounter(newestRoom,selected);
   setStatus('ADMIN SPAWNED '+selected);
   adminFeedback.textContent=selected+' SPAWNS IN THE LOBBY, THEN CHARGES TO THE LATEST DOOR';
+ }else if(selected==='A-60'){
+  const newestRoom=Math.max(1,room,furthestRoom);
+  startA60Encounter(newestRoom);
+  setStatus('ADMIN SPAWNED A-60');
+  adminFeedback.textContent='A-60 CHARGES TO THE LATEST ROOM CENTER, WAITS 4–6 SECONDS, THEN FADES';
  }else{
   adminFeedback.textContent='UNKNOWN ENTITY';
   return;
  }
  if(entity&&(entity.type==='A-25'||entity.type==='C-25'))a25Started=true;
  adminPanel.style.display='none';adminPanel.setAttribute('aria-hidden','true');
- sound(selected==='A-25'?62:selected==='C-25'?92:selected==='A-45'?125:selected==='C-45'?155:118,.35,'sawtooth',.028);
+ sound(selected==='A-25'?62:selected==='C-25'?92:selected==='A-45'?125:selected==='C-45'?155:selected==='A-60'?165:118,.35,'sawtooth',.028);
 }
 function openDoor(direction){
  const boundary=direction>0?(room+1)*ROOM_LENGTH:room*ROOM_LENGTH;
@@ -161,6 +172,11 @@ function nearbyDoor(){
 }
 function handleRoomEntered(nextRoomNumber){
  setStatus('ROOM A-'+String(nextRoomNumber).padStart(3,'0')+' ENTERED');
+ if(nextRoomNumber===60&&!entity&&Math.random()<.21){startA60Encounter(nextRoomNumber);return}
+ if(nextRoomNumber===45&&!entity&&Math.random()<.38){
+  startA45Encounter(nextRoomNumber,Math.random()<.032?'C-45':'A-45');
+  return;
+ }
  if(nextRoomNumber>=A25_ROOM&&!entity&&!a25Started&&Math.random()<.32){startA25Encounter(nextRoomNumber);return}
  const spawnRate=getEntitySpawnRate('A-1');
  if(!entity&&entityCooldown<=0&&Math.random()<spawnRate){
@@ -311,7 +327,29 @@ function update(dt){
      showOverlay(entity.type+' FOUND YOU','Stay hidden until the entity has passed.','TRY AGAIN','GAME OVER');return;
     }
    }
-  }}else if(entity){
+  }}else if(entity&&entity.type==='A-60'){
+   if(entity.phase==='charge'){
+    entity.z=Math.min(entity.targetZ,entity.z+entity.speed*dt);
+    if(entity.z>=entity.targetZ){
+     entity.phase='wait';
+     entity.age=0;
+     setStatus('A-60 IS WAITING IN THE MIDDLE OF ROOM A-'+String(entity.targetRoom).padStart(3,'0'));
+    }
+   }else if(entity.phase==='wait'){
+    entity.age+=dt;
+    if(entity.age>=entity.waitDuration){
+     entity.phase='fade';
+     entity.age=0;
+     setStatus('A-60 IS FADING OUT');
+    }
+   }else if(entity.phase==='fade'){
+    entity.age+=dt;
+    if(entity.age>=1.25){
+     entity=null;
+     setStatus('A-60 DESPAWNED');
+    }
+   }
+  }else if(entity){
   if(entity.type==='A-25'||entity.type==='C-25'){
    entity.age+=dt;
    entity.particleTimer-=dt;
@@ -679,6 +717,9 @@ a45Sprite.src='./assets/a45.webp';
 const c45Sprite=new Image();
 c45Sprite.decoding='async';
 c45Sprite.src='./assets/c45.webp';
+const a60Sprite=new Image();
+a60Sprite.decoding='async';
+a60Sprite.src='./assets/a60.gif';
 function drawA1SpriteAt(worldX,worldZ,height,alpha,baseHeight=0,glow=true){
  if(!a1Sprite.complete||!a1Sprite.naturalWidth)return;
  const cameraPoint=cameraSpace(worldX,worldZ,baseHeight);
@@ -778,6 +819,27 @@ function drawA25(){
  else{ctx.fillStyle=isC45?'rgba(245,45,255,.88)':isA45?'rgba(255,175,35,.88)':isC25?'rgba(255,65,220,.82)':'rgba(45,245,85,.68)';ctx.fillRect(base.x-w*.18,top.y+h*.12,w*.36,h*.82);ctx.beginPath();ctx.arc(base.x,top.y+h*.1,w*.19,0,Math.PI*2);ctx.fill()}
  ctx.restore();
 }
+function drawA60(){
+ if(!entity||entity.type!=='A-60')return;
+ const cameraPoint=cameraSpace(entity.x,entity.z,0);
+ if(cameraPoint.forward<1.35||cameraPoint.forward>58)return;
+ const base=project(entity.x,entity.z,0),top=project(entity.x,entity.z,3.2);
+ if(!base||!top||base.x<-220||base.x>W+220)return;
+ const h=clamp(Math.abs(base.y-top.y),2,500);
+ const aspect=a60Sprite.complete&&a60Sprite.naturalWidth&&a60Sprite.naturalHeight?a60Sprite.naturalWidth/a60Sprite.naturalHeight:.62;
+ const w=clamp(h*aspect,2,520);
+ if(h<2||w<2||!Number.isFinite(h+w))return;
+ const alpha=entity.phase==='fade'?clamp(1-entity.age/1.25,0,1):1;
+ ctx.save();
+ ctx.globalAlpha=alpha;
+ ctx.imageSmoothingEnabled=true;
+ if(a60Sprite.complete&&a60Sprite.naturalWidth)ctx.drawImage(a60Sprite,base.x-w/2,top.y,w,h);
+ else{
+  ctx.fillStyle='rgba(245,245,245,.75)';
+  ctx.beginPath();ctx.ellipse(base.x,top.y+h*.5,w*.28,h*.46,0,0,Math.PI*2);ctx.fill();
+ }
+ ctx.restore();
+}
 function drawA1(){
  if(!entity||entity.type!=='A-1')return;
  for(const clone of entity.clones){
@@ -789,7 +851,7 @@ function drawA1(){
 }
 function drawEntity(){
  if(!entity)return;
- if(entity.type==='A-25'||entity.type==='C-25'||entity.type==='A-45'||entity.type==='C-45')drawA25();else drawA1();
+ if(entity.type==='A-60')drawA60();else if(entity.type==='A-25'||entity.type==='C-25'||entity.type==='A-45'||entity.type==='C-45')drawA25();else drawA1();
 }
 function drawPixelCanvasText(text,x,baseline,font,color,align){
  if(!a1LabelCanvas){
